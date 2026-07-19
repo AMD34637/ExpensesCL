@@ -1,0 +1,487 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0E1626" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" type="image/png" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>ميزانية الأسرة</title>
+<style>
+  :root {
+    --bg: #F7F5F0; --surface: #FFFFFF; --surface-2: #EFECE4; --ink: #17202E;
+    --ink-soft: #5A6678; --line: #DDD8CC; --accent: #B8860B; --accent-ink: #8A6508;
+    --bar: #C29A2B;
+    --ok: #2E7D5B; --ok-soft: #E2EFE8;
+    --near: #A8750A; --near-soft: #F5EBD3;
+    --over: #B04A42; --over-soft: #F4E3E1;
+    --btn-bg: #17202E; --btn-ink: #F5EBD3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0E1626; --surface: #162034; --surface-2: #1C2840; --ink: #E9E6DC;
+      --ink-soft: #97A2B5; --line: #2A3652; --accent: #D9A441; --accent-ink: #E4BC6A;
+      --bar: #D9A441;
+      --ok: #3FA576; --ok-soft: #17342A;
+      --near: #D9A441; --near-soft: #33290F;
+      --over: #C4554D; --over-soft: #3A211F;
+      --btn-bg: #D9A441; --btn-ink: #14100A;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #F7F5F0; --surface: #FFFFFF; --surface-2: #EFECE4; --ink: #17202E;
+    --ink-soft: #5A6678; --line: #DDD8CC; --accent: #B8860B; --accent-ink: #8A6508;
+    --bar: #C29A2B; --ok: #2E7D5B; --ok-soft: #E2EFE8; --near: #A8750A; --near-soft: #F5EBD3;
+    --over: #B04A42; --over-soft: #F4E3E1; --btn-bg: #17202E; --btn-ink: #F5EBD3;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1626; --surface: #162034; --surface-2: #1C2840; --ink: #E9E6DC;
+    --ink-soft: #97A2B5; --line: #2A3652; --accent: #D9A441; --accent-ink: #E4BC6A;
+    --bar: #D9A441; --ok: #3FA576; --ok-soft: #17342A; --near: #D9A441; --near-soft: #33290F;
+    --over: #C4554D; --over-soft: #3A211F; --btn-bg: #D9A441; --btn-ink: #14100A;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    direction: rtl; background: var(--bg); color: var(--ink); margin: 0;
+    font-family: "Segoe UI", "SF Arabic", "Noto Naskh Arabic", "Geeza Pro", Tahoma, system-ui, sans-serif;
+    line-height: 1.7;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 80px; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  header.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header.top h1 { font-size: 1.45rem; margin: 0; }
+  .month-nav { display: flex; align-items: center; gap: 6px; }
+  .month-nav button {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    color: var(--ink); cursor: pointer; font-size: 1rem; padding: 5px 13px; font-family: inherit;
+  }
+  .month-nav button:hover { border-color: var(--accent); }
+  #month-label { font-weight: 700; min-width: 130px; text-align: center; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 16px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+  .tile .k { font-size: 0.78rem; color: var(--ink-soft); }
+  .tile .v { font-size: 1.35rem; font-weight: 800; }
+  .tile .v.ok { color: var(--ok); } .tile .v.over { color: var(--over); }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-top: 14px; }
+  .panel h2 { font-size: 1rem; margin: 0 0 12px; }
+  .hint { color: var(--ink-soft); font-size: 0.84rem; }
+
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+  .f { display: flex; flex-direction: column; gap: 3px; }
+  .f label { font-size: 0.78rem; color: var(--ink-soft); }
+  .f input, .f select {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
+    color: var(--ink); padding: 9px 11px; font-size: 0.98rem; font-family: inherit; width: 100%;
+  }
+  .f input:focus, .f select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    background: var(--surface-2); color: var(--ink-soft); border: none; padding: 9px 18px;
+    cursor: pointer; font-family: inherit; font-size: 0.95rem;
+  }
+  .seg button.on { background: var(--btn-bg); color: var(--btn-ink); font-weight: 700; }
+
+  .primary {
+    background: var(--btn-bg); color: var(--btn-ink); border: none; border-radius: 8px;
+    padding: 10px 26px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .primary:hover { opacity: 0.92; }
+  .ghost {
+    background: none; border: 1px solid var(--line); border-radius: 8px; color: var(--ink);
+    padding: 7px 16px; cursor: pointer; font-family: inherit; font-size: 0.88rem;
+  }
+  .ghost:hover { border-color: var(--accent); }
+  .del { background: none; border: none; color: var(--over); cursor: pointer; font-size: 1rem; padding: 2px 8px; }
+
+  .meter { margin: 12px 0; }
+  .meter .row1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 0.9rem; }
+  .meter .amounts { color: var(--ink-soft); font-size: 0.82rem; }
+  .track { background: var(--surface-2); border-radius: 4px; height: 12px; margin-top: 4px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 0 4px 4px 0; background: var(--ok); min-width: 2px; }
+  .fill.near { background: var(--near); } .fill.over { background: var(--over); }
+  .chip { font-size: 0.72rem; padding: 1px 10px; border-radius: 999px; white-space: nowrap; }
+  .chip.ok { background: var(--ok-soft); color: var(--ok); }
+  .chip.near { background: var(--near-soft); color: var(--near); }
+  .chip.over { background: var(--over-soft); color: var(--over); }
+  .budget-edit input { width: 110px; padding: 4px 8px; font-size: 0.88rem; }
+
+  .bars .brow { display: grid; grid-template-columns: 110px 1fr 90px; gap: 10px; align-items: center; margin: 7px 0; font-size: 0.88rem; }
+  .bars .btrack { background: var(--surface-2); border-radius: 4px; height: 16px; }
+  .bars .bfill { height: 100%; background: var(--bar); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .bars .bval { color: var(--ink-soft); font-size: 0.84rem; }
+
+  .tbl { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { border-bottom: 1px solid var(--line); padding: 7px 10px; text-align: right; }
+  th { color: var(--ink-soft); font-size: 0.78rem; font-weight: 600; }
+  .tag-in { color: var(--ok); font-weight: 700; }
+  .tag-out { color: var(--ink); }
+
+  .members-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .member-chip {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 6px 3px 12px; font-size: 0.88rem; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .member-chip button { background: none; border: none; color: var(--over); cursor: pointer; font-size: 0.9rem; }
+
+  .io-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  #io-text { width: 100%; min-height: 90px; background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 8px; color: var(--ink); padding: 10px; font-family: monospace; font-size: 0.8rem; display: none; }
+  #io-text.show { display: block; }
+  .empty { color: var(--ink-soft); text-align: center; padding: 14px 0; font-size: 0.9rem; }
+  footer { margin-top: 24px; color: var(--ink-soft); font-size: 0.78rem; text-align: center; }
+  #save-note { font-size: 0.78rem; color: var(--ok); visibility: hidden; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>🏠 ميزانية الأسرة</h1>
+    <div class="month-nav">
+      <button id="prev" aria-label="الشهر السابق">▶</button>
+      <span id="month-label" class="num"></span>
+      <button id="next" aria-label="الشهر التالي">◀</button>
+    </div>
+  </header>
+
+  <div class="tiles">
+    <div class="tile"><div class="k">دخل الشهر</div><div class="v num ok" id="t-in">0</div></div>
+    <div class="tile"><div class="k">مصاريف الشهر</div><div class="v num" id="t-out">0</div></div>
+    <div class="tile"><div class="k">المتبقي</div><div class="v num" id="t-left">0</div></div>
+    <div class="tile"><div class="k">نسبة الادخار</div><div class="v num" id="t-save">—</div></div>
+  </div>
+
+  <section class="panel">
+    <h2>إضافة عملية <span id="save-note">✓ محفوظ</span></h2>
+    <div style="margin-bottom: 10px;">
+      <span class="seg">
+        <button id="mode-out" class="on">مصروف</button>
+        <button id="mode-in">دخل</button>
+      </span>
+    </div>
+    <div class="form-grid">
+      <div class="f"><label for="amount">المبلغ (ر.س)</label>
+        <input id="amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" /></div>
+      <div class="f" id="f-cat"><label for="cat">الفئة</label><select id="cat"></select></div>
+      <div class="f"><label for="member">الفرد</label><select id="member"></select></div>
+      <div class="f"><label for="date">التاريخ</label><input id="date" type="date" /></div>
+      <div class="f"><label for="note">ملاحظة (اختياري)</label><input id="note" placeholder="مثال: بقالة الأسبوع" /></div>
+      <button class="primary" id="add">أضف</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>حدود الإنفاق الشهرية</h2>
+    <p class="hint">حدد سقفًا لكل فئة وسيظهر تنبيه عند الاقتراب (80%) أو التجاوز. اترك الحد صفرًا لتجاهل الفئة.</p>
+    <div style="margin-bottom: 6px;"><button class="ghost" id="edit-budgets">تعديل الحدود</button></div>
+    <div id="meters"></div>
+  </section>
+
+  <section class="panel">
+    <h2>توزيع مصاريف الشهر حسب الفئة</h2>
+    <div class="bars" id="bars"></div>
+    <div class="empty" id="bars-empty" style="display:none;">لا مصاريف مسجلة هذا الشهر</div>
+  </section>
+
+  <section class="panel">
+    <h2>حسب أفراد الأسرة</h2>
+    <div class="tbl"><table id="member-table">
+      <thead><tr><th>الفرد</th><th>دخل</th><th>مصروف</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel">
+    <h2>عمليات الشهر</h2>
+    <div class="tbl"><table id="tx-table">
+      <thead><tr><th>التاريخ</th><th>النوع</th><th>الفئة/المصدر</th><th>الفرد</th><th>ملاحظة</th><th>المبلغ</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="empty" id="tx-empty" style="display:none;">لا عمليات هذا الشهر — أضف أول عملية من الأعلى</div>
+  </section>
+
+  <section class="panel">
+    <h2>الأفراد والبيانات</h2>
+    <div class="members-row" id="members-list"></div>
+    <div class="form-grid" style="margin-top: 10px; grid-template-columns: 200px auto 1fr;">
+      <div class="f"><label for="new-member">إضافة فرد</label><input id="new-member" placeholder="مثال: أم عبدالله" /></div>
+      <button class="ghost" id="add-member" style="align-self: end;">أضف الفرد</button>
+    </div>
+    <div class="io-row">
+      <button class="ghost" id="export">نسخة احتياطية (تصدير)</button>
+      <button class="ghost" id="import">استيراد نسخة</button>
+      <button class="ghost" id="wipe" style="color: var(--over); border-color: var(--over);">مسح كل البيانات</button>
+    </div>
+    <textarea id="io-text" aria-label="بيانات النسخة الاحتياطية"></textarea>
+    <p class="hint" id="io-hint" style="display:none;"></p>
+  </section>
+
+  <footer>البيانات تُحفظ تلقائيًا في متصفح هذا الجهاز فقط — خذ نسخة احتياطية دوريًا لمشاركتها أو نقلها.</footer>
+</div>
+
+<script>
+  const CATS = [
+    ["سكن وإيجار", "🏠"], ["بقالة وتموين", "🛒"], ["مطاعم وقهوة", "🍽️"],
+    ["مواصلات وبنزين", "⛽"], ["فواتير واتصالات", "💡"], ["صحة", "🩺"],
+    ["تعليم", "📚"], ["أطفال", "🧸"], ["ملابس", "👕"], ["ترفيه", "🎉"],
+    ["ادخار واستثمار", "💰"], ["أخرى", "📦"]
+  ];
+  const KEY = "family-budget-v1";
+  const AR_MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+
+  let state = { members: ["أنا"], budgets: {}, tx: [] };
+  let mem = false;
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) state = Object.assign(state, JSON.parse(raw));
+  } catch (e) { mem = true; }
+
+  function save() {
+    if (!mem) { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { mem = true; } }
+    const n = document.getElementById("save-note");
+    n.style.visibility = "visible";
+    setTimeout(() => { n.style.visibility = "hidden"; }, 1200);
+  }
+
+  const today = new Date();
+  let view = { y: today.getFullYear(), m: today.getMonth() };
+  let mode = "out";
+
+  const fmt = n => n.toLocaleString("ar-SA", { maximumFractionDigits: 0 }) + " ر.س";
+  const monthKey = () => view.y + "-" + String(view.m + 1).padStart(2, "0");
+
+  const catSel = document.getElementById("cat");
+  CATS.forEach(([name, icon]) => {
+    const o = document.createElement("option");
+    o.value = name; o.textContent = icon + " " + name;
+    catSel.appendChild(o);
+  });
+
+  function refreshMembers() {
+    const sel = document.getElementById("member");
+    sel.innerHTML = "";
+    state.members.forEach(m => {
+      const o = document.createElement("option"); o.value = o.textContent = m; sel.appendChild(o);
+    });
+    const list = document.getElementById("members-list");
+    list.innerHTML = "";
+    state.members.forEach(m => {
+      const c = document.createElement("span");
+      c.className = "member-chip";
+      c.textContent = m + " ";
+      if (state.members.length > 1) {
+        const x = document.createElement("button");
+        x.textContent = "✕"; x.setAttribute("aria-label", "حذف " + m);
+        x.addEventListener("click", () => {
+          if (state.tx.some(t => t.member === m) && !confirm("عند " + m + " عمليات مسجلة — حذف الفرد لن يحذفها. متابعة؟")) return;
+          state.members = state.members.filter(v => v !== m);
+          save(); refreshMembers();
+        });
+        c.appendChild(x);
+      }
+      list.appendChild(c);
+    });
+  }
+
+  document.getElementById("add-member").addEventListener("click", () => {
+    const inp = document.getElementById("new-member");
+    const name = inp.value.trim();
+    if (!name || state.members.includes(name)) return;
+    state.members.push(name);
+    inp.value = ""; save(); refreshMembers();
+  });
+
+  document.getElementById("mode-out").addEventListener("click", () => setMode("out"));
+  document.getElementById("mode-in").addEventListener("click", () => setMode("in"));
+  function setMode(m) {
+    mode = m;
+    document.getElementById("mode-out").classList.toggle("on", m === "out");
+    document.getElementById("mode-in").classList.toggle("on", m === "in");
+    document.getElementById("f-cat").querySelector("label").textContent = m === "out" ? "الفئة" : "المصدر";
+    if (m === "in") {
+      catSel.innerHTML = "";
+      ["💼 راتب", "🏦 عائد استثمار", "🎁 دعم/هدية", "📦 دخل آخر"].forEach(s => {
+        const o = document.createElement("option"); o.value = s.replace(/^\S+\s/, ""); o.textContent = s; catSel.appendChild(o);
+      });
+    } else {
+      catSel.innerHTML = "";
+      CATS.forEach(([name, icon]) => {
+        const o = document.createElement("option"); o.value = name; o.textContent = icon + " " + name; catSel.appendChild(o);
+      });
+    }
+  }
+
+  document.getElementById("add").addEventListener("click", () => {
+    const amount = parseFloat(document.getElementById("amount").value);
+    if (!amount || amount <= 0) { document.getElementById("amount").focus(); return; }
+    state.tx.push({
+      id: Date.now() + Math.random().toString(16).slice(2),
+      type: mode,
+      date: document.getElementById("date").value || new Date().toISOString().slice(0, 10),
+      cat: catSel.value,
+      member: document.getElementById("member").value,
+      note: document.getElementById("note").value.trim(),
+      amount
+    });
+    document.getElementById("amount").value = "";
+    document.getElementById("note").value = "";
+    save(); render();
+    document.getElementById("amount").focus();
+  });
+
+  document.getElementById("prev").addEventListener("click", () => { view.m--; if (view.m < 0) { view.m = 11; view.y--; } render(); });
+  document.getElementById("next").addEventListener("click", () => { view.m++; if (view.m > 11) { view.m = 0; view.y++; } render(); });
+
+  let editBudgets = false;
+  document.getElementById("edit-budgets").addEventListener("click", () => {
+    editBudgets = !editBudgets;
+    document.getElementById("edit-budgets").textContent = editBudgets ? "حفظ الحدود" : "تعديل الحدود";
+    if (!editBudgets) {
+      document.querySelectorAll(".budget-edit input").forEach(inp => {
+        const val = parseFloat(inp.value) || 0;
+        if (val > 0) state.budgets[inp.dataset.cat] = val; else delete state.budgets[inp.dataset.cat];
+      });
+      save();
+    }
+    render();
+  });
+
+  document.getElementById("export").addEventListener("click", () => {
+    const ta = document.getElementById("io-text");
+    ta.value = JSON.stringify(state);
+    ta.classList.add("show"); ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    try { navigator.clipboard && navigator.clipboard.writeText(ta.value); } catch (e) {}
+    showHint("انسخ النص أعلاه واحفظه في ملاحظاتك — أو أرسله لجهاز آخر ثم استخدم «استيراد نسخة» هناك.");
+  });
+  document.getElementById("import").addEventListener("click", () => {
+    const ta = document.getElementById("io-text");
+    if (!ta.classList.contains("show") || !ta.value.trim()) {
+      ta.classList.add("show"); ta.value = "";
+      ta.placeholder = "الصق النسخة الاحتياطية هنا ثم اضغط «استيراد نسخة» مرة ثانية";
+      ta.focus(); return;
+    }
+    try {
+      const data = JSON.parse(ta.value);
+      if (!Array.isArray(data.tx) || !Array.isArray(data.members)) throw 0;
+      state = Object.assign({ members: ["أنا"], budgets: {}, tx: [] }, data);
+      save(); refreshMembers(); render();
+      ta.classList.remove("show");
+      showHint("تم الاستيراد بنجاح ✓");
+    } catch (e) { showHint("النص الملصوق ليس نسخة صالحة — تأكد من لصقه كاملًا كما صُدِّر."); }
+  });
+  document.getElementById("wipe").addEventListener("click", () => {
+    if (!confirm("سيُمسح كل شيء نهائيًا (الأفراد والعمليات والحدود). متأكد؟")) return;
+    state = { members: ["أنا"], budgets: {}, tx: [] };
+    save(); refreshMembers(); render();
+  });
+  function showHint(msg) {
+    const h = document.getElementById("io-hint");
+    h.textContent = msg; h.style.display = "block";
+  }
+
+  function render() {
+    document.getElementById("month-label").textContent = AR_MONTHS[view.m] + " " + view.y;
+    document.getElementById("date").value = (monthKey() === new Date().toISOString().slice(0, 7))
+      ? new Date().toISOString().slice(0, 10) : monthKey() + "-01";
+
+    const tx = state.tx.filter(t => t.date.startsWith(monthKey()));
+    const inSum = tx.filter(t => t.type === "in").reduce((s, t) => s + t.amount, 0);
+    const outSum = tx.filter(t => t.type === "out").reduce((s, t) => s + t.amount, 0);
+    document.getElementById("t-in").textContent = fmt(inSum);
+    document.getElementById("t-out").textContent = fmt(outSum);
+    const left = inSum - outSum;
+    const tl = document.getElementById("t-left");
+    tl.textContent = fmt(left);
+    tl.className = "v num " + (left < 0 ? "over" : "ok");
+    document.getElementById("t-save").textContent = inSum > 0 ? Math.round(left / inSum * 100) + "%" : "—";
+
+    const byCat = {};
+    tx.filter(t => t.type === "out").forEach(t => { byCat[t.cat] = (byCat[t.cat] || 0) + t.amount; });
+
+    const meters = document.getElementById("meters");
+    meters.innerHTML = "";
+    CATS.forEach(([name, icon]) => {
+      const limit = state.budgets[name] || 0;
+      const spent = byCat[name] || 0;
+      if (!editBudgets && limit === 0) return;
+      const div = document.createElement("div");
+      div.className = "meter";
+      if (editBudgets) {
+        div.innerHTML = '<div class="row1 budget-edit"><span>' + icon + ' ' + name + '</span>' +
+          '<span><input type="number" min="0" data-cat="' + name + '" value="' + (limit || "") + '" placeholder="بدون حد" /> ر.س</span></div>';
+      } else {
+        const pct = limit > 0 ? spent / limit * 100 : 0;
+        const cls = pct > 100 ? "over" : pct >= 80 ? "near" : "ok";
+        const label = pct > 100 ? "⚠ تجاوز" : pct >= 80 ? "◔ اقترب" : "✓ ضمن الحد";
+        div.innerHTML =
+          '<div class="row1"><span>' + icon + ' ' + name + ' <span class="chip ' + cls + '">' + label + '</span></span>' +
+          '<span class="amounts num">' + fmt(spent) + ' من ' + fmt(limit) + '</span></div>' +
+          '<div class="track"><div class="fill ' + cls + '" style="width:' + Math.min(pct, 100) + '%"></div></div>';
+      }
+      meters.appendChild(div);
+    });
+    if (!editBudgets && meters.children.length === 0) {
+      meters.innerHTML = '<div class="empty">ما حددت أي حدود بعد — اضغط «تعديل الحدود» وابدأ</div>';
+    }
+
+    const bars = document.getElementById("bars");
+    bars.innerHTML = "";
+    const entries = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+    document.getElementById("bars-empty").style.display = entries.length ? "none" : "block";
+    const max = entries.length ? entries[0][1] : 1;
+    entries.forEach(([name, val]) => {
+      const icon = (CATS.find(c => c[0] === name) || ["", "📦"])[1];
+      const row = document.createElement("div");
+      row.className = "brow";
+      row.innerHTML = '<span>' + icon + ' ' + name + '</span>' +
+        '<div class="btrack"><div class="bfill" style="width:' + (val / max * 100) + '%"></div></div>' +
+        '<span class="bval num">' + fmt(val) + '</span>';
+      bars.appendChild(row);
+    });
+
+    const mtb = document.querySelector("#member-table tbody");
+    mtb.innerHTML = "";
+    state.members.forEach(m => {
+      const mi = tx.filter(t => t.member === m && t.type === "in").reduce((s, t) => s + t.amount, 0);
+      const mo = tx.filter(t => t.member === m && t.type === "out").reduce((s, t) => s + t.amount, 0);
+      if (mi === 0 && mo === 0) return;
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td>" + m + '</td><td class="num tag-in">' + fmt(mi) + '</td><td class="num">' + fmt(mo) + "</td>";
+      mtb.appendChild(tr);
+    });
+
+    const ttb = document.querySelector("#tx-table tbody");
+    ttb.innerHTML = "";
+    const sorted = [...tx].sort((a, b) => b.date.localeCompare(a.date));
+    document.getElementById("tx-empty").style.display = sorted.length ? "none" : "block";
+    sorted.forEach(t => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td class="num">' + t.date.slice(8) + "/" + t.date.slice(5, 7) + "</td>" +
+        '<td class="' + (t.type === "in" ? "tag-in" : "tag-out") + '">' + (t.type === "in" ? "دخل" : "مصروف") + "</td>" +
+        "<td>" + t.cat + "</td><td>" + t.member + "</td><td>" + (t.note || "—") + "</td>" +
+        '<td class="num">' + (t.type === "in" ? "+" : "−") + fmt(t.amount) + "</td>";
+      const td = document.createElement("td");
+      const del = document.createElement("button");
+      del.className = "del"; del.textContent = "✕"; del.setAttribute("aria-label", "حذف العملية");
+      del.addEventListener("click", () => {
+        state.tx = state.tx.filter(x => x.id !== t.id);
+        save(); render();
+      });
+      td.appendChild(del); tr.appendChild(td);
+      ttb.appendChild(tr);
+    });
+  }
+
+  refreshMembers();
+  render();
+
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+</script>

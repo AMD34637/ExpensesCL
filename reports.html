@@ -1,0 +1,365 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>تقارير التحليل — محلل الأسهم</title>
+<style>
+  :root {
+    --bg: #F7F5F0; --surface: #FFFFFF; --surface-2: #EFECE4; --ink: #17202E;
+    --ink-soft: #5A6678; --line: #DDD8CC; --accent: #B8860B; --accent-ink: #8A6508;
+    --up: #2E7D5B; --up-soft: #E2EFE8; --down: #B04A42; --down-soft: #F4E3E1;
+    --hold: #A8750A; --hold-soft: #F5EBD3;
+    --tab-on-bg: #17202E; --tab-on-ink: #F5EBD3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0E1626; --surface: #162034; --surface-2: #1C2840; --ink: #E9E6DC;
+      --ink-soft: #97A2B5; --line: #2A3652; --accent: #D9A441; --accent-ink: #E4BC6A;
+      --up: #3FA576; --up-soft: #17342A; --down: #C4554D; --down-soft: #3A211F;
+      --hold: #D9A441; --hold-soft: #33290F;
+      --tab-on-bg: #D9A441; --tab-on-ink: #14100A;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #F7F5F0; --surface: #FFFFFF; --surface-2: #EFECE4; --ink: #17202E;
+    --ink-soft: #5A6678; --line: #DDD8CC; --accent: #B8860B; --accent-ink: #8A6508;
+    --up: #2E7D5B; --up-soft: #E2EFE8; --down: #B04A42; --down-soft: #F4E3E1;
+    --hold: #A8750A; --hold-soft: #F5EBD3;
+    --tab-on-bg: #17202E; --tab-on-ink: #F5EBD3;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1626; --surface: #162034; --surface-2: #1C2840; --ink: #E9E6DC;
+    --ink-soft: #97A2B5; --line: #2A3652; --accent: #D9A441; --accent-ink: #E4BC6A;
+    --up: #3FA576; --up-soft: #17342A; --down: #C4554D; --down-soft: #3A211F;
+    --hold: #D9A441; --hold-soft: #33290F;
+    --tab-on-bg: #D9A441; --tab-on-ink: #14100A;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    direction: rtl; background: var(--bg); color: var(--ink); margin: 0;
+    font-family: "Segoe UI", "SF Arabic", "Noto Naskh Arabic", "Geeza Pro", Tahoma, system-ui, sans-serif;
+    line-height: 1.75;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 26px 18px 70px; }
+
+  header.top { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+  header.top h1 { font-size: 1.45rem; margin: 0; }
+  .date { color: var(--ink-soft); font-size: 0.82rem; }
+
+  .tabs { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .tabs button {
+    font-family: inherit; cursor: pointer; font-size: 0.98rem;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 999px; padding: 8px 20px;
+  }
+  .tabs button .sym { font-family: "SF Mono", Consolas, monospace; letter-spacing: 1px; font-weight: 700; }
+  .tabs button[aria-selected="true"] { background: var(--tab-on-bg); color: var(--tab-on-ink); border-color: var(--tab-on-bg); }
+  .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .verdict {
+    margin-top: 16px; border: 1px solid var(--line); border-radius: 12px;
+    background: var(--surface); padding: 20px; display: grid; gap: 14px;
+  }
+  .v-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .v-name h2 { margin: 0; font-size: 1.3rem; }
+  .v-name .sub { color: var(--ink-soft); font-size: 0.88rem; }
+  .pill {
+    display: inline-block; padding: 8px 22px; border-radius: 999px;
+    font-weight: 800; font-size: 1.05rem; white-space: nowrap;
+  }
+  .pill.hold { background: var(--hold-soft); color: var(--hold); }
+  .pill.avoid { background: var(--down-soft); color: var(--down); }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+  .fact { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; }
+  .fact .k { font-size: 0.75rem; color: var(--ink-soft); letter-spacing: 0.3px; }
+  .fact .v { font-size: 1.02rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .fact .v.neg { color: var(--down); }
+  .fact .v.pos { color: var(--up); }
+  .oneliner { margin: 0; font-size: 0.95rem; color: var(--ink-soft); border-top: 1px dashed var(--line); padding-top: 12px; }
+  .oneliner b { color: var(--ink); }
+
+  details.sec {
+    margin-top: 10px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface); overflow: hidden;
+  }
+  details.sec summary {
+    cursor: pointer; list-style: none; padding: 14px 18px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  details.sec summary::-webkit-details-marker { display: none; }
+  details.sec summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .firm {
+    font-family: "SF Mono", Consolas, monospace; font-size: 0.68rem; letter-spacing: 1.4px;
+    color: var(--accent-ink); direction: ltr; flex-shrink: 0; width: 118px; text-align: right;
+  }
+  .sec-title { font-weight: 700; font-size: 1rem; flex: 1; }
+  .chev { color: var(--ink-soft); transition: transform 150ms ease; font-size: 0.8rem; }
+  details[open] .chev { transform: rotate(90deg); }
+  .sec-body { padding: 4px 18px 18px; border-top: 1px solid var(--line); font-size: 0.94rem; }
+  .sec-body p { margin: 10px 0; }
+  .sec-body ul { margin: 8px 0; padding-right: 20px; padding-left: 0; }
+  .sec-body li { margin: 5px 0; }
+  .sec-body b.warn { color: var(--down); }
+  .sec-body b.good { color: var(--up); }
+
+  .tbl { overflow-x: auto; margin: 12px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { border: 1px solid var(--line); padding: 7px 12px; text-align: right; }
+  th { background: var(--surface-2); font-size: 0.82rem; }
+  td { font-variant-numeric: tabular-nums; }
+
+  .callout {
+    border-radius: 8px; padding: 12px 16px; margin: 12px 0; font-size: 0.92rem;
+  }
+  .callout.plan { background: var(--surface-2); border-right: 3px solid var(--accent); }
+  .callout.danger { background: var(--down-soft); border-right: 3px solid var(--down); }
+
+  .final { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 20px; }
+  .final h3 { margin: 0 0 10px; font-size: 1.1rem; }
+
+  footer { margin-top: 26px; color: var(--ink-soft); font-size: 0.78rem; text-align: center; }
+  .panel-view { display: none; }
+  .panel-view.on { display: block; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>📊 تقارير التحليل</h1>
+    <span class="date">بيانات 17–19 يوليو 2026 · ست عدسات وول ستريت</span>
+  </header>
+
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div id="views"></div>
+
+  <footer>
+    تحليل تعليمي وليس توصية استثمارية · لطلب تحليل سهم جديد اكتب رمزه في محادثة Claude وسيُضاف هنا
+  </footer>
+</div>
+
+<script>
+  const REPORTS = [
+    {
+      sym: "AAPL", name: "Apple Inc", sub: "ناسداك · تقنية — أجهزة وخدمات",
+      verdict: { label: "احتفاظ", cls: "hold", conviction: "6.5/10" },
+      facts: [
+        { k: "السعر", v: "$333.69" },
+        { k: "القيمة السوقية", v: "$4.92T" },
+        { k: "أداء 2026", v: "+20%", cls: "pos" },
+        { k: "P/E", v: "~40" },
+        { k: "عائد التوزيع", v: "0.33%" }
+      ],
+      oneliner: "<b>الخلاصة بسطر:</b> شركة استثنائية بسعر مرتفع — لا تشترِ عند القمة ولا تبِع مركزك الرابح. نقطة الدخول المجزية $315 أو 290–295، وانتبه لأرباح 30 يوليو.",
+      sections: [
+        { firm: "GOLDMAN SACHS", title: "التحليل الأساسي", body: `
+          <p>نموذج عمل من الأنقى عالميًا: أجهزة بهامش عالٍ تبني قاعدة ملياري جهاز نشط، ثم خدمات (App Store، iCloud، اشتراكات) تحلب اشتراكات متكررة بهامش أعلى.</p>
+          <div class="tbl"><table>
+            <tr><th>ربع مارس 2026</th><th>القيمة</th><th>الملاحظة</th></tr>
+            <tr><td>الإيراد الكلي</td><td>$111.2B ‏(+17%)</td><td>رقم قياسي لربع مارس</td></tr>
+            <tr><td>آيفون</td><td>$57.0B</td><td>قياسي — زخم iPhone 17</td></tr>
+            <tr><td>الخدمات</td><td>$31.0B</td><td>أعلى مستوى تاريخي</td></tr>
+            <tr><td>EPS</td><td>$2.01 ‏(+22%)</td><td>أسرع من الإيراد = توسع هوامش</td></tr>
+          </table></div>
+          <ul>
+            <li>إعادة شراء جديدة <b>$100 مليار</b> + رفع التوزيع 4% — أولوية واضحة لإعادة الشراء.</li>
+            <li>الخندق التنافسي: العلامة 10/10 · المنظومة 9/10 · التسعير 9/10 · الشبكة 8/10.</li>
+            <li><b class="warn">المشكلة: التقييم.</b> P/E ‏~40 مقابل متوسط تاريخي ~29 — مسعّر على الكمال.</li>
+            <li>السيناريو المتفائل (12 شهر): $380–400 · المتشائم: $250–270 بانضغاط المكرر وحده.</li>
+          </ul>` },
+        { firm: "MORGAN STANLEY", title: "التحليل الفني", body: `
+          <div class="callout plan"><b>خطة التداول:</b> قمة تاريخية بزخم قوي لكنه ممدود ومتشبع قبل أرباح 30 يوليو — الدخول المفضل عند إعادة اختبار $315 · وقف تحت $289 · أهداف $350 ثم $380.</div>
+          <ul>
+            <li>الترند صاعد على كل الأطر؛ السعر فوق قمة الـ52 أسبوع ($328.7) — لا مقاومات فوقية.</li>
+            <li>MA50 ‏≈ $289 و MA200 ‏≈ $300 والسعر أعلى منهما بـ +15% — ترند قوي لكن <b class="warn">ممدود</b>.</li>
+            <li>RSI في منطقة التشبع الشرائي (70+) بعد صعود الأسابيع الأخيرة (قراءات المصادر متفاوتة).</li>
+            <li>الدعوم: $315 ← 290–295 (تجمع المتوسطات) ← $246.</li>
+            <li>بولنجر: السعر يلامس النطاق العلوي بعد توسّع — احتمال تهدئة وارد.</li>
+            <li><b>عامل حاسم:</b> أي دخول قبل أرباح 30 يوليو هو مراهنة على حدث، ليس صفقة فنية.</li>
+          </ul>` },
+        { firm: "BRIDGEWATER", title: "تقييم المخاطر", body: `
+          <div class="tbl"><table>
+            <tr><th>المؤشر</th><th>القراءة</th><th>التقييم</th></tr>
+            <tr><td>بيتا</td><td>~1.11</td><td>أعلى من السوق بقليل</td></tr>
+            <tr><td>تذبذب 30 يوم</td><td>~39%</td><td>مرتفع (موسم أرباح)</td></tr>
+            <tr><td>التذبذب الضمني</td><td>~47%</td><td>السوق يسعّر حركة كبيرة</td></tr>
+            <tr><td>أقصى هبوط 52 أسبوع</td><td>-33%</td><td>حتى العملاق ينزل ثلثه</td></tr>
+          </table></div>
+          <ul>
+            <li>اختبار الركود: تاريخيًا ‏-57% في 2008 و ‏-30% في كورونا/2022؛ تقدير انهيار حاد من P/E ‏40: ‏<b class="warn">-35% إلى -50%</b>.</li>
+            <li><b class="warn">أهم خطر حالي:</b> فيدرالي متشدد (Warsh) يسعّر رفعات سبتمبر/أكتوبر/ديسمبر — مكررات النمو في مرمى النيران.</li>
+            <li>تركّز خفي: AAPL ‏~7% من S&P 500 — إن كنت تملك صناديق مؤشرات فأنت تملكه أصلًا.</li>
+            <li>التحوّط لحامل مركز كبير: <b>collar</b> (بوت 315 / كول 350) أذكى من بوت وحده لأن التذبذب الضمني غالي.</li>
+          </ul>` },
+        { firm: "JPMORGAN", title: "نتائج الأرباح", body: `
+          <div class="callout plan"><b>الموعد: الخميس 30 يوليو 2026 بعد الإغلاق.</b> التموضع الأذكى: لا شراء جديد قبل الإعلان — تداول ردة الفعل.</div>
+          <ul>
+            <li>السجل: تجاوز التوقعات <b class="good">4 من آخر 4 أرباع</b>؛ آخر مرة +3.7% والتي قبلها +4.7%.</li>
+            <li>الإجماع: إيراد ~$108.9B و EPS ‏~$1.88 ‏(+20%) — داخل نطاق توجيه الإدارة (14–17%) وهم عادة يوفون.</li>
+            <li>الـ Whisper أعلى من الإجماع — تجاوز بسيط قد لا يكفي عند هذا التقييم.</li>
+            <li>راقب: إيراد الخدمات فوق $30B · توجيه ربع سبتمبر (iPhone 18) · إشارات خلافة تيم كوك.</li>
+            <li>الحركة الضمنية يوم الأرباح: ‏±4–5% (~$13–17).</li>
+            <li>الخطة: gap up فوق $345 لا تطارده · gap down تحت $315 انتظر استقرار 290–300 فهي شراء أفضل · افتتاح ثابت: الترند سيد الموقف فوق $315.</li>
+          </ul>` },
+        { firm: "BLACKROCK", title: "دخل التوزيعات", body: `
+          <p><b>الحكم:</b> AAPL ليس سهم دخل — إنه سهم نمو يدفع "إكرامية".</p>
+          <div class="tbl"><table>
+            <tr><th>المؤشر</th><th>القيمة</th></tr>
+            <tr><td>العائد الحالي</td><td>0.33% (من الأدنى بالسوق)</td></tr>
+            <tr><td>التوزيع الربعي</td><td>$0.27 — رفع 4% في أبريل</td></tr>
+            <tr><td>سنوات الزيادة المتتالية</td><td>14 سنة (Aristocrat يحتاج 25)</td></tr>
+            <tr><td>نسبة التوزيع</td><td>~12.7% من الأرباح</td></tr>
+            <tr><td>أمان التوزيع</td><td><b class="good">10/10</b> — صفر خطر قص</td></tr>
+          </table></div>
+          <ul>
+            <li>$10,000 تدر اليوم ~$33 سنويًا فقط؛ بعد 20 سنة نمو ~$88 — دخل رمزي.</li>
+            <li>"التوزيع" الحقيقي هو إعادة الشراء ($100B) — تقليص الأسهم بدل الكاش.</li>
+            <li>الاستحقاق القادم: يُعلن مع نتائج 30 يوليو (متوقع أوائل أغسطس).</li>
+            <li>فخ العائد: غير موجود إطلاقًا — العكس، العائد منخفض لأن السعر سبق التوزيعات.</li>
+          </ul>` },
+        { firm: "CITADEL", title: "تدوير القطاعات", body: `
+          <ul>
+            <li>الدورة: توسع متأخر يتجه للتباطؤ — تضخم عنيد + فيدرالي متشدد = <b>risk-off تدريجي</b> ودوران من النمو إلى القيمة.</li>
+            <li>الصدارة حاليًا: <b class="good">الماليات +18.3%</b> ثم الطاقة والرعاية الصحية؛ التقنية تفقد القوة النسبية.</li>
+            <li>موقع AAPL: قاوم الدوران حتى الآن (+20% في 2026) بفضل زخم iPhone 17 — <b>القوة النسبية معه اليوم والماكرو ضده غدًا.</b></li>
+          </ul>
+          <div class="tbl"><table>
+            <tr><th>القطاع</th><th>الوزن المقترح</th><th>ETF</th><th>التوجه</th></tr>
+            <tr><td>الماليات</td><td>20%</td><td>XLF</td><td>زيادة ✚</td></tr>
+            <tr><td>الرعاية الصحية</td><td>16%</td><td>XLV</td><td>زيادة ✚</td></tr>
+            <tr><td>الطاقة</td><td>12%</td><td>XLE</td><td>زيادة ✚</td></tr>
+            <tr><td>التقنية (تشمل AAPL)</td><td>18%</td><td>XLK</td><td>تخفيف ▼</td></tr>
+            <tr><td>الصناعات</td><td>10%</td><td>XLI</td><td>حياد</td></tr>
+            <tr><td>السلع الأساسية</td><td>10%</td><td>XLP</td><td>حياد دفاعي</td></tr>
+            <tr><td>المرافق والعقار</td><td>6%</td><td>XLU/XLRE</td><td>تخفيف ▼</td></tr>
+            <tr><td>كاش/سندات قصيرة</td><td>8%</td><td>SGOV</td><td>ذخيرة للتصحيح</td></tr>
+          </table></div>` }
+      ],
+      final: `
+        <div class="tbl"><table>
+          <tr><th>أقوى 3 نقاط مؤيدة</th><th>أخطر 3 مخاطر</th></tr>
+          <tr><td>نتائج قياسية: +17% إيراد، +22% أرباح، تفوق 4/4</td><td>P/E ‏~40 مقابل متوسط ~29 — مسعّر على الكمال</td></tr>
+          <tr><td>آلة كاش: $100B إعادة شراء + خندق 9–10/10</td><td>فيدرالي متشدد = انضغاط مباشر للمكرر</td></tr>
+          <tr><td>زخم فني صاعد وقمم تاريخية بلا مقاومة</td><td>حدث مزدوج 30 يوليو: أرباح + غموض خلافة تيم كوك</td></tr>
+        </table></div>
+        <p><b>الخطة:</b> للحامل: احتفظ وفكّر بـ collar حول الأرباح · للداخل الجديد: اصبر لـ $315 أو 290–295 أو ما بعد الأرباح · لمستثمر الدخل: هذا ليس سهمك.</p>`
+    },
+    {
+      sym: "CJMB", name: "Callan JMB Inc", sub: "ناسداك · لوجستيات طبية مبردة — نانو كاب",
+      verdict: { label: "تجنّب", cls: "avoid", conviction: "8/10" },
+      facts: [
+        { k: "السعر", v: "$0.86" },
+        { k: "القيمة السوقية", v: "$4.9M" },
+        { k: "من القمة", v: "-85%", cls: "neg" },
+        { k: "إيراد 2025", v: "$5.7M ↓" },
+        { k: "خسارة التشغيل", v: "-$7.0M", cls: "neg" }
+      ],
+      oneliner: "<b>الخلاصة بسطر:</b> لا تدخل فيه كاستثمار — شركة تحرق أكثر من إيرادها، تحت إنذار شطب من ناسداك، وتتموّل ببيع أسهم عليك. خبر الشراكة وعدٌ بلا عقود موقعة حتى الآن.",
+      sections: [
+        { firm: "GOLDMAN SACHS", title: "التحليل الأساسي", body: `
+          <p>لوجستيات "السلسلة الباردة" الطبية (شحن وتخزين مبرّد للقاحات والعلاجات الخلوية والعينات) عبر Coldchain Technology Services. القطاع واعد — الشركة متناهية الصغر.</p>
+          <div class="tbl"><table>
+            <tr><th>المؤشر</th><th>القيمة</th><th>القراءة</th></tr>
+            <tr><td>إيراد 2025</td><td>$5.7M (من $6.6M)</td><td><b class="warn">ينكمش -14%</b></td></tr>
+            <tr><td>الربح الإجمالي</td><td>$2.1M (~37%)</td><td>هامش مقبول</td></tr>
+            <tr><td>خسارة التشغيل</td><td>-$7.0M</td><td><b class="warn">تفوق الإيراد كاملًا</b></td></tr>
+            <tr><td>الكاش / الدين</td><td>$4.2M / $2.2M</td><td>مدرج نقدي أقل من سنة</td></tr>
+          </table></div>
+          <ul>
+            <li><b>حدث 16 يوليو:</b> شراكة Alabama State University (21% من الإيراد الإجمالي، حديث عن ~$105M سنويًا للشركة) — السهم +50% بعد الإغلاق إلى $1.29. لكنها <b class="warn">طموحات غير ملزمة</b> من شركة إيرادها $5.7M.</li>
+            <li>المزايا التنافسية: العلامة 2/10 · التسعير 3/10 · لزوجة العقود 4/10 · الشبكة 1/10.</li>
+          </ul>` },
+        { firm: "MORGAN STANLEY", title: "التحليل الفني", body: `
+          <div class="callout danger"><b>سهم سنتات في ترند هابط مدمر (-85%) كسر للتو بخبر</b> — أي تداول هنا مضاربة خبر بحتة، ليست صفقة فنية.</div>
+          <ul>
+            <li>المستويات: دعم $0.65 (القاع) · <b>$1.00 مقاومة نفسية وتنظيمية</b> (شرط ناسداك) · فوقها فراغ حتى ~$2.</li>
+            <li>المؤشرات الفنية (RSI/MACD) شبه عديمة القيمة في ميكروكاب — شمعة خبر واحدة تمسحها.</li>
+            <li>المؤشر الوحيد المهم: <b>الفوليوم</b> — هل يستمر أيامًا (اهتمام حقيقي) أم يتبخر خلال 48 ساعة (مضخة وتفريغ)؟</li>
+            <li>لمن يضارب رغم كل شيء: مبلغ تتقبل خسارته كاملًا · دخول فقط بثبات فوق $1.00 · وقف تحت $0.80 · أهداف $1.60 ثم $2.00 · <b class="warn">أوامر محددة فقط — لا أوامر سوقية</b>.</li>
+          </ul>` },
+        { firm: "BRIDGEWATER", title: "تقييم المخاطر", body: `
+          <div class="tbl"><table>
+            <tr><th>الخطر</th><th>الحالة</th><th>الدرجة</th></tr>
+            <tr><td>الشطب من ناسداك</td><td>إنذار 29 يونيو — مهلة حتى <b>28 ديسمبر 2026</b></td><td>🔴 حرج</td></tr>
+            <tr><td>التخفيف</td><td>ATM بقيمة $5M = <b>100% من القيمة السوقية</b> + أسهم زادت 27% في سنة</td><td>🔴 حرج</td></tr>
+            <tr><td>الاستمرارية</td><td>حرق $7M سنويًا مقابل $4.2M كاش</td><td>🔴 حرج</td></tr>
+            <tr><td>السيولة</td><td>5.6M سهم فقط — سبريد واسع وخروج صعب</td><td>🔴 عالي</td></tr>
+            <tr><td>التذبذب</td><td>±50% في جلسة أمر عادي</td><td>🔴 قصوى</td></tr>
+          </table></div>
+          <ul>
+            <li>ارتباطه بالسوق شبه معدوم — رهان خاص بقصته، قادر على -80% أو +300% بمعزل عن كل شيء.</li>
+            <li>لا سوق أوبشن سائل — <b>التحوط الوحيد هو حجم المركز: حد أقصى 1% من المحفظة</b>.</li>
+          </ul>` },
+        { firm: "JPMORGAN", title: "نتائج الأرباح", body: `
+          <ul>
+            <li>لا تغطية محللين ولا إجماع ولا whisper — أدوات المعاينة المؤسسية غير متاحة لهذا الحجم أصلًا.</li>
+            <li>النتائج نصف السنوية متوقعة أغسطس/سبتمبر 2026 (بدون موعد رسمي بعد).</li>
+            <li><b>الأرقام الوحيدة المهمة:</b> معدل حرق الكاش والرصيد · كم سهم بيع عبر الـ ATM وبأي سعر · أي إيراد <b>متعاقد</b> من شراكة Alabama State (أرقام موقعة لا تصريحات) · خطة استعادة شرط $1.00.</li>
+            <li>الاحتمال الوارد جدًا: <b class="warn">دمج عكسي للأسهم (reverse split)</b> — تاريخيًا سلبي لهذه الفئة.</li>
+            <li>لا معنى لـ"التموضع قبل الأرباح" — محرك السهم أخبار الشراكة والتمويل، ليس التقرير الدوري.</li>
+          </ul>` },
+        { firm: "BLACKROCK", title: "دخل التوزيعات", body: `
+          <p><b>أقصر قسم في التقرير: لا توجد توزيعات ولن توجد.</b></p>
+          <ul>
+            <li>شركة خاسرة تحرق الكاش وتبيع أسهمًا لتبقى حية — التوزيع غير وارد لسنوات على الأقل.</li>
+            <li>كل مؤشرات هذا القسم (العائد، النمو، الأمان، DRIP، الضرائب) = لا تنطبق.</li>
+            <li>إذا هدفك دخل توزيعات فهذا السهم عكس هدفك تمامًا.</li>
+          </ul>` },
+        { firm: "CITADEL", title: "تدوير القطاعات", body: `
+          <ul>
+            <li>الثيم الكبير (سلسلة التبريد للعلاجات الخلوية والأدوية المخصصة) <b class="good">حقيقي وممتاز بنيويًا</b> — أفضل ما يقال في صالح القصة.</li>
+            <li>لكن الماكرو ضد الصغيرة الخاسرة تحديدًا: فيدرالي متشدد يجفف تمويل الشركات الصغيرة — وهي تعتمد على التمويل للبقاء. <b class="warn">أسوأ توقيت ماكرو ممكن.</b></li>
+            <li>دوران السوق نحو XLV لا يلمس شركة قيمتها $4.9M — المال المؤسسي لا يصل هنا.</li>
+            <li><b>البديل الأذكى لنفس الثيم:</b> شركات مربحة راسخة بنفس المجال أو ETF رعاية صحية — نفس القصة بدون خطر الصفر.</li>
+          </ul>` }
+      ],
+      final: `
+        <div class="tbl"><table>
+          <tr><th>ما يغري في القصة</th><th>ما يقتلها</th></tr>
+          <tr><td>شراكة بسقف معلن ~$105M سنويًا (18 ضعف الإيراد!)</td><td>مجرد إعلان — صفر إيراد متعاقد عليه</td></tr>
+          <tr><td>قطاع نموه البنيوي حقيقي</td><td>إيراد الشركة ينكمش والخسارة تفوق الإيراد</td></tr>
+          <tr><td>صافي كاش موجب والسهم قرب قاعه</td><td>إنذار شطب + ATM بحجم القيمة السوقية + كاش لأشهر</td></tr>
+        </table></div>
+        <p><b>الخطة:</b> كمستثمر: ابتعد · كمضارب واعٍ: 1% كحد أقصى، فوق $1.00 فقط، وقف تحت $0.80، وراقب ملفات 8-K لأي عقد فعلي · المواعيد الحاسمة: نتائج أغسطس/سبتمبر ومهلة ناسداك <b>28 ديسمبر 2026</b>.</p>`
+    }
+  ];
+
+  const tabsEl = document.getElementById("tabs");
+  const viewsEl = document.getElementById("views");
+
+  REPORTS.forEach((r, i) => {
+    const t = document.createElement("button");
+    t.setAttribute("role", "tab");
+    t.setAttribute("aria-selected", i === 0 ? "true" : "false");
+    t.innerHTML = '<span class="sym">' + r.sym + '</span> — ' + r.name;
+    t.addEventListener("click", () => select(i));
+    tabsEl.appendChild(t);
+
+    const v = document.createElement("div");
+    v.className = "panel-view" + (i === 0 ? " on" : "");
+    v.innerHTML =
+      '<section class="verdict">' +
+        '<div class="v-head">' +
+          '<div class="v-name"><h2>' + r.name + ' <span style="font-family:monospace;color:var(--accent-ink);">' + r.sym + '</span></h2>' +
+          '<div class="sub">' + r.sub + '</div></div>' +
+          '<div style="text-align:left;"><span class="pill ' + r.verdict.cls + '">' + r.verdict.label + '</span>' +
+          '<div class="date" style="margin-top:4px;">درجة القناعة ' + r.verdict.conviction + '</div></div>' +
+        '</div>' +
+        '<div class="facts">' + r.facts.map(f =>
+          '<div class="fact"><div class="k">' + f.k + '</div><div class="v ' + (f.cls || '') + '">' + f.v + '</div></div>'
+        ).join('') + '</div>' +
+        '<p class="oneliner">' + r.oneliner + '</p>' +
+      '</section>' +
+      r.sections.map(s =>
+        '<details class="sec"><summary><span class="firm">' + s.firm + '</span>' +
+        '<span class="sec-title">' + s.title + '</span><span class="chev">◀</span></summary>' +
+        '<div class="sec-body">' + s.body + '</div></details>'
+      ).join('') +
+      '<section class="final"><h3>🎯 الخلاصة النهائية — ' + r.verdict.label + ' (' + r.verdict.conviction + ')</h3>' + r.final + '</section>';
+    viewsEl.appendChild(v);
+  });
+
+  function select(i) {
+    tabsEl.querySelectorAll("button").forEach((b, j) => b.setAttribute("aria-selected", String(i === j)));
+    viewsEl.querySelectorAll(".panel-view").forEach((v, j) => v.classList.toggle("on", i === j));
+    scrollTo({ top: 0, behavior: "smooth" });
+  }
+</script>

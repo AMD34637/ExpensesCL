@@ -1,0 +1,495 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>محلل الأسهم — أدوات وول ستريت</title>
+<style>
+  :root {
+    --bg: #F7F5F0;
+    --surface: #FFFFFF;
+    --surface-2: #EFECE4;
+    --ink: #17202E;
+    --ink-soft: #5A6678;
+    --line: #DDD8CC;
+    --accent: #B8860B;
+    --accent-ink: #8A6508;
+    --accent-soft: #F5EBD3;
+    --up: #2E7D5B;
+    --down: #B04A42;
+    --chip-on-bg: #17202E;
+    --chip-on-ink: #F5EBD3;
+    --code-bg: #17202E;
+    --code-ink: #E8E4D8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0E1626;
+      --surface: #162034;
+      --surface-2: #1C2840;
+      --ink: #E9E6DC;
+      --ink-soft: #97A2B5;
+      --line: #2A3652;
+      --accent: #D9A441;
+      --accent-ink: #E4BC6A;
+      --accent-soft: #2A2C22;
+      --chip-on-bg: #D9A441;
+      --chip-on-ink: #14100A;
+      --code-bg: #0A101D;
+      --code-ink: #DFDACB;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #F7F5F0; --surface: #FFFFFF; --surface-2: #EFECE4; --ink: #17202E;
+    --ink-soft: #5A6678; --line: #DDD8CC; --accent: #B8860B; --accent-ink: #8A6508;
+    --accent-soft: #F5EBD3; --up: #2E7D5B; --down: #B04A42;
+    --chip-on-bg: #17202E; --chip-on-ink: #F5EBD3; --code-bg: #17202E; --code-ink: #E8E4D8;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1626; --surface: #162034; --surface-2: #1C2840; --ink: #E9E6DC;
+    --ink-soft: #97A2B5; --line: #2A3652; --accent: #D9A441; --accent-ink: #E4BC6A;
+    --accent-soft: #2A2C22; --up: #3FA576; --down: #C4554D;
+    --chip-on-bg: #D9A441; --chip-on-ink: #14100A; --code-bg: #0A101D; --code-ink: #DFDACB;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    direction: rtl;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", "SF Arabic", "Noto Naskh Arabic", "Geeza Pro", Tahoma, system-ui, sans-serif;
+    margin: 0;
+    line-height: 1.7;
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  header.top {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 6px;
+  }
+  .brand h1 { font-size: 1.7rem; margin: 0; letter-spacing: -0.5px; text-wrap: balance; }
+  .brand .sub { color: var(--ink-soft); font-size: 0.95rem; margin-top: 2px; }
+  .tick {
+    font-family: "SF Mono", Consolas, Menlo, monospace;
+    color: var(--accent-ink); font-size: 0.8rem; letter-spacing: 2px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 18px;
+  }
+  .panel h2 {
+    font-size: 1.02rem; margin: 0 0 4px;
+  }
+  .hint { color: var(--ink-soft); font-size: 0.88rem; margin: 0 0 14px; }
+
+  .sym-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 4px; flex: 1 1 220px; }
+  .field label { font-size: 0.82rem; color: var(--ink-soft); letter-spacing: 0.3px; }
+  .field input, .field select, .field textarea {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--ink);
+    padding: 10px 12px;
+    font-size: 1rem;
+    font-family: inherit;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  #symbol {
+    font-family: "SF Mono", Consolas, Menlo, monospace;
+    font-size: 1.15rem; letter-spacing: 1px; font-variant-numeric: tabular-nums;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .card {
+    text-align: right;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--ink);
+    font-size: 0.92rem;
+    line-height: 1.6;
+    transition: border-color 120ms ease, background 120ms ease;
+    position: relative;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card .firm {
+    font-family: "SF Mono", Consolas, Menlo, monospace;
+    font-size: 0.78rem; letter-spacing: 1.5px; color: var(--accent-ink);
+    display: block; direction: ltr; text-align: right;
+  }
+  .card .name { font-weight: 700; font-size: 1.02rem; display: block; margin: 2px 0 4px; }
+  .card .desc { color: var(--ink-soft); font-size: 0.86rem; display: block; }
+  .card .mark {
+    position: absolute; top: 12px; left: 14px;
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 1.5px solid var(--line);
+    display: grid; place-items: center;
+    font-size: 0.8rem; color: transparent;
+    transition: all 120ms ease;
+  }
+  .card[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .card[aria-pressed="true"] .mark {
+    background: var(--chip-on-bg); border-color: var(--chip-on-bg); color: var(--chip-on-ink);
+  }
+
+  .quick { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .quick button {
+    background: none; border: 1px solid var(--line); border-radius: 999px;
+    color: var(--ink-soft); padding: 5px 14px; font-size: 0.85rem;
+    cursor: pointer; font-family: inherit;
+  }
+  .quick button:hover { border-color: var(--accent); color: var(--ink); }
+
+  .extras { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+  .extras .field { display: none; }
+  .extras .field.show { display: flex; }
+
+  .go {
+    margin-top: 18px;
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  #generate {
+    background: var(--chip-on-bg); color: var(--chip-on-ink);
+    border: none; border-radius: 8px;
+    padding: 12px 34px; font-size: 1.05rem; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+  }
+  #generate:hover { opacity: 0.92; }
+  .count { color: var(--ink-soft); font-size: 0.88rem; }
+
+  #out { display: none; }
+  #out.show { display: block; }
+  .out-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .out-actions { display: flex; gap: 8px; }
+  .out-actions button {
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 18px; font-size: 0.92rem; cursor: pointer; font-family: inherit;
+  }
+  .out-actions button:hover { border-color: var(--accent); }
+  #copied { color: var(--up); font-size: 0.88rem; display: none; }
+  #copied.show { display: inline; }
+  pre#prompt {
+    background: var(--code-bg); color: var(--code-ink);
+    border-radius: 10px; padding: 20px;
+    white-space: pre-wrap; word-break: break-word;
+    font-family: inherit; font-size: 0.95rem; line-height: 1.9;
+    max-height: 480px; overflow-y: auto; overflow-x: auto;
+    margin: 14px 0 0;
+  }
+  .usage { color: var(--ink-soft); font-size: 0.88rem; margin-top: 10px; }
+  .usage b { color: var(--ink); }
+
+  footer { margin-top: 28px; color: var(--ink-soft); font-size: 0.8rem; text-align: center; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>محلل الأسهم</h1>
+      <div class="sub">ست عدسات تحليل بأسلوب أكبر بيوت المال — أدخل الرمز واختر التحليل</div>
+    </div>
+    <div class="tick">GS · MS · BW · JPM · BLK · CTDL</div>
+  </header>
+
+  <section class="panel">
+    <h2>١ — بيانات السهم</h2>
+    <p class="hint">أدخل رمز السهم أو اسمه (مثال: AAPL أو أرامكو 2222). التفاصيل الإضافية اختيارية وتظهر حسب نوع التحليل.</p>
+    <div class="sym-row">
+      <div class="field" style="flex: 0 1 240px;">
+        <label for="symbol">رمز السهم أو اسمه</label>
+        <input id="symbol" placeholder="AAPL" autocomplete="off" />
+      </div>
+      <div class="field" style="flex: 0 1 200px;">
+        <label for="market">السوق</label>
+        <select id="market">
+          <option value="">تلقائي</option>
+          <option>السوق الأمريكي</option>
+          <option>السوق السعودي (تداول)</option>
+          <option>سوق آخر</option>
+        </select>
+      </div>
+    </div>
+    <div class="extras" style="margin-top: 12px;">
+      <div class="field" data-for="ms">
+        <label for="position">وضعك الحالي (للتحليل الفني)</label>
+        <select id="position">
+          <option>أتابعه بس</option>
+          <option>LONG — شاري</option>
+          <option>SHORT — بايع</option>
+        </select>
+      </div>
+      <div class="field" data-for="jpm">
+        <label for="edate">تاريخ إعلان الأرباح إن عرفته (لتحليل الأرباح)</label>
+        <input id="edate" placeholder="مثال: 2026-08-01 أو اتركه فاضي" />
+      </div>
+      <div class="field" data-for="blk">
+        <label for="amount">مبلغ الاستثمار التقريبي (لدخل التوزيعات)</label>
+        <input id="amount" placeholder="مثال: 100,000 ريال أو $10,000" />
+      </div>
+      <div class="field" data-for="bw">
+        <label for="holdings">ممتلكاتك ونسبها (لتقييم المخاطر)</label>
+        <textarea id="holdings" rows="2" placeholder="مثال: AAPL 30%، MSFT 20%، كاش 10% — الإجمالي $50,000"></textarea>
+      </div>
+      <div class="field" data-for="ctdl">
+        <label for="profile">تحمّلك للمخاطر ومدتك (لتدوير القطاعات)</label>
+        <textarea id="profile" rows="2" placeholder="مثال: مخاطرة متوسطة، مدة 3-5 سنوات، متركّز حاليًا في التقنية"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>٢ — اختر عدسات التحليل</h2>
+    <p class="hint">كل عدسة مبنية على منهجية بيت مالي معروف. اختر وحدة أو أكثر — أو الكل للتقرير الشامل.</p>
+    <div class="quick">
+      <button type="button" id="all">تحديد الكل</button>
+      <button type="button" id="none">إلغاء الكل</button>
+    </div>
+    <div class="grid" id="cards"></div>
+  </section>
+
+  <div class="go">
+    <button id="generate">أنشئ برومبت التحليل</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <section class="panel" id="out">
+    <div class="out-head">
+      <h2 style="margin: 0;">٣ — البرومبت جاهز</h2>
+      <div class="out-actions">
+        <button id="copy">نسخ البرومبت</button>
+        <span id="copied">تم النسخ ✓</span>
+      </div>
+    </div>
+    <pre id="prompt"></pre>
+    <p class="usage"><b>طريقة الاستخدام:</b> انسخ البرومبت والصقه في محادثة Claude (أو أي مساعد ذكاء اصطناعي متصل ببيانات السوق) وبيرجع لك التقرير كاملًا بالأقسام والجداول. كلما كان النموذج أحدث وبياناته أقرب لليوم، كان التحليل أدق.</p>
+  </section>
+
+  <footer>منهجيات مستوحاة من أطر التحليل المتداولة لبيوت المال الكبرى — للأغراض التعليمية، وليست توصية استثمارية.</footer>
+</div>
+
+<script>
+  const FRAMEWORKS = [
+    {
+      id: "gs", firm: "GOLDMAN SACHS", name: "التحليل الأساسي",
+      desc: "نموذج العمل، الربحية، الميزانية، التدفقات، التقييم، وقرار نهائي بدرجة قناعة.",
+      persona: "بصفتك محلل أبحاث أسهم أول بمنهجية التحليل الأساسي المؤسسي (على غرار Goldman Sachs)، حلّل السهم أساسيًا بعمق:",
+      items: [
+        "تفكيك نموذج العمل: كيف الشركة تحقق أرباحها بشرح بسيط",
+        "مصادر الإيرادات: كل قطاع ونسبته من الدخل ومسار نموّه",
+        "تحليل الربحية: توجهات الهامش الإجمالي والتشغيلي والصافي خلال 5 سنوات",
+        "قوة الميزانية: الدين إلى حقوق الملكية، النسبة الجارية، والكاش مقارنة بإجمالي الدين",
+        "التدفقات النقدية الحرة: عائد FCF، معدل نمو FCF، وأولويات توزيع رأس المال",
+        "المزايا التنافسية: قوة التسعير، قوة العلامة، صعوبة تغيير المزوّد، وتأثير الشبكة (قيّمها من 1 إلى 10)",
+        "جودة الإدارة: سجلهم في توزيع رأس المال، تملّك الداخليين، وتوافق التعويضات",
+        "لقطة التقييم: P/E و P/S و EV/EBITDA الحالية مقارنة بمتوسط 5 سنوات وبمنافسي القطاع",
+        "السيناريو المتفائل والمتشائم مع هدف سعري 12 شهر لكل سيناريو",
+        "خلاصة بفقرة واحدة: شراء أو احتفاظ أو تجنّب، مع درجة قناعة"
+      ]
+    },
+    {
+      id: "ms", firm: "MORGAN STANLEY", name: "التحليل الفني",
+      desc: "الترند، الدعوم والمقاومات، المتوسطات، RSI، MACD، بولنجر، وخطة صفقة كاملة.",
+      persona: "بصفتك استراتيجي فني أول يوجّه أكبر مكاتب التداول (على غرار Morgan Stanley) في نماذج الشارت وإشارات الزخم ونقاط الدخول والخروج، أعطني تحليلًا فنيًا كاملًا مع ملخص خطة تداول واضح في الأعلى:",
+      items: [
+        "تحليل الترند: اتجاه الترند الأساسي على اليومي والأسبوعي والشهري",
+        "الدعوم والمقاومات: مستويات سعرية دقيقة يُتوقع الارتداد أو التعليق عندها",
+        "المتوسطات المتحركة: 20 و50 و100 و200 يوم، ومواقع السعر منها، وإشارات التقاطعات",
+        "قراءة RSI: الرقم الحالي وتفسيره (تشبّع شراء / تشبّع بيع / محايد)",
+        "تحليل MACD: تقاطعات خط الإشارة، زخم الهيستوغرام، ورصد الدايفرجنس",
+        "Bollinger Bands: موقع السعر داخل النطاقات وهل يوجد squeeze أو توسّع",
+        "تحليل الفوليوم: هل حجم التداول يؤكد الحركة أم يعاكسها",
+        "فيبوناتشي: أهم مستويات التصحيح من آخر موجة قوية",
+        "نماذج الشارت: رأس وكتفين، قمتان، كوب وعروة، أو أعلام إن وُجدت",
+        "خطة الصفقة: نقطة دخول محددة، وقف خسارة، وهدفا ربح مع نسبة العائد إلى المخاطرة"
+      ]
+    },
+    {
+      id: "bw", firm: "BRIDGEWATER", name: "تقييم المخاطر",
+      desc: "التذبذب، البيتا، أقصى هبوط، اختبار ركود، ومقترحات تحوّط على مستوى المحفظة.",
+      persona: "بصفتك محلل مخاطر محافظ أول متدرّب على مبادئ Ray Dalio و All Weather (على غرار Bridgewater Associates)، أعطني تقييم مخاطر كامل بصيغة مذكرة مخاطر مع جدول داشبورد وتوصيات على مستوى المحفظة:",
+      items: [
+        "ملف التذبذب: التذبذب التاريخي والضمني مقارنة بالقطاع والسوق",
+        "تحليل البيتا: مقدار حركة السهم مقارنة بـ S&P 500 وقت الصعود ووقت النزول",
+        "أقصى هبوط تاريخي: أسوأ النزولات من قمة إلى قاع في آخر 10 سنوات ومدة التعافي",
+        "تحليل الارتباط: كيف يتحرك السهم مقارنة ببقية ممتلكاتي",
+        "مخاطر تركّز القطاع: هل أنا متركّز بشكل زائد في صناعة أو ثيم واحد",
+        "حساسية الفائدة: كيف يؤثر ارتفاع أو انخفاض الفوائد على السهم تحديدًا",
+        "اختبار ركود: تقدير نزول السعر في انهيار مثل 2008 أو جائحة كورونا",
+        "مخاطر الأرباح: مقدار حركة السهم يوم النتائج ومواعيد المحفزات القادمة",
+        "مخاطر السيولة: متوسط حجم التداول اليومي وتحليل السبريد بين العرض والطلب",
+        "توصية التحوّط: استراتيجيات أوبشن محددة أو مراكز عكسية تحمي من النزول"
+      ]
+    },
+    {
+      id: "jpm", firm: "JPMORGAN", name: "تحليل نتائج الأرباح",
+      desc: "تاريخ المفاجآت، التقديرات، الحركة الضمنية، والتموضع قبل وبعد إعلان النتائج.",
+      persona: "بصفتك محلل أبحاث أسهم أول يكتب تحليلات ما قبل وبعد الأرباح لعملاء التداول المؤسسي (على غرار JPMorgan)، أعطني تحليل أرباح كاملًا بصيغة معاينة أرباح مع ملخص قرار وخطة تداول في الأعلى:",
+      items: [
+        "تاريخ الأرباح: آخر 6 أرباع EPS — تجاوزت أم قصّرت عن التوقعات، مع ردة فعل السعر كل مرة",
+        "تقديرات الإيرادات و EPS للربع القادم حسب إجماع محللي وول ستريت",
+        "الـ Whisper number: ما يتوقعه السوق فعليًا مقابل الإجماع المعلن",
+        "أهم الأرقام: 3 إلى 5 مؤشرات تحدد إن كان السهم سيصعد أو ينزل",
+        "توقعات القطاعات: تفصيل الإيرادات حسب خطوط العمل مع تقديرات النمو",
+        "توجيه الإدارة: بماذا وعدوا الربع الماضي وهل عادةً يوفون",
+        "الحركة الضمنية بالأوبشن: مقدار التذبذب الذي يتوقعه السوق يوم الأرباح",
+        "أنماط يوم الأرباح تاريخيًا: متوسط ووسيط الحركة في آخر 8 تقارير",
+        "التموضع قبل الأرباح: أشتري قبلها؟ أبيع قبلها؟ أم أنتظر ردة الفعل؟",
+        "خطة ما بعد الأرباح: كيف أتداول سيناريوهات gap up و gap down والافتتاح الثابت"
+      ]
+    },
+    {
+      id: "blk", firm: "BLACKROCK", name: "دخل التوزيعات",
+      desc: "العائد ونموه وأمانه، توقع الدخل، DRIP، الضرائب، وفحص فخ العائد المرتفع.",
+      persona: "بصفتك محلل دخل توزيعات أول (على غرار BlackRock)، حلّل السهم من منظور الدخل والتوزيعات:",
+      items: [
+        "عائد التوزيع الحالي مقارنة بمتوسط 5 سنوات ومتوسط القطاع",
+        "معدل نمو التوزيعات: النمو السنوي المركب خلال 3 و5 و10 سنوات",
+        "عدد سنوات زيادة التوزيع المتتالية (هل هو Aristocrat أو King)",
+        "تحليل نسبة التوزيع: كم من الأرباح ومن FCF يذهب كتوزيعات",
+        "درجة أمان التوزيعات: قيّمها من 1 إلى 10 بناءً على payout ratio والديون واستقرار الكاش فلو",
+        "توقع الدخل: دخل سنوي متنامٍ من التوزيعات على مبلغي الاستثماري خلال 10 و20 سنة",
+        "تراكم DRIP: توقع العائد الكلي لو أعيد استثمار كل التوزيعات تلقائيًا",
+        "تقويم الاستحقاق: المواعيد القادمة التي يجب امتلاك السهم قبلها لأخذ التوزيع",
+        "المعاملة الضريبية: qualified أم ordinary وأفضل نوع حساب للاستفادة الضريبية",
+        "فحص فخ العائد: هل العائد المرتفع مستدام أم إنذار بقصّ توزيعات قريب"
+      ]
+    },
+    {
+      id: "ctdl", firm: "CITADEL", name: "تدوير القطاعات",
+      desc: "الدورة الاقتصادية، ترتيب القطاعات الـ11، القوة النسبية، وأفضل ETF لكل قطاع.",
+      persona: "بصفتك استراتيجي ماكرو أول يدير استراتيجيات تدوير القطاعات حسب الدورة الاقتصادية وسياسة الفيدرالي والقوة النسبية (على غرار Citadel)، أعطني مذكرة استراتيجية قطاعات مع جدول ترتيب وتوصية توزيع ودليل تطبيق عبر ETF، وبيّن موقع هذا السهم وقطاعه من الدورة الحالية:",
+      items: [
+        "وضع الدورة الاقتصادية: أين نحن من دورة توسّع / قمة / انكماش / قاع",
+        "ترتيب أداء القطاعات: القطاعات الـ11 مرتّبة بعوائد شهر و3 أشهر و6 أشهر",
+        "تحليل القوة النسبية: أي القطاعات تكتسب زخمًا وأيها يفقده",
+        "أثر الفائدة: من يستفيد ومن يتضرر من اتجاه سياسة الفيدرالي الحالي",
+        "مقارنة نمو الأرباح: تقديرات نمو الأرباح المستقبلية لكل قطاع",
+        "مقارنة التقييمات: Forward P/E لكل قطاع مقابل متوسطه التاريخي 10 سنوات",
+        "تدفقات الأموال: أي القطاعات فيها شراء مؤسسي وأيها فيها بيع",
+        "دفاعي أم هجومي: هل وضع السوق risk-on أم risk-off",
+        "أفضل اختيارات ETF: أفضل ETF لكل قطاع تُوصي بزيادته مع رسوم الإدارة",
+        "نموذج توزيع القطاعات: نسب أوزان دقيقة لمحفظة قطاعات محسّنة الآن"
+      ]
+    }
+  ];
+
+  const selected = new Set(FRAMEWORKS.map(f => f.id));
+  const cardsEl = document.getElementById("cards");
+
+  FRAMEWORKS.forEach(f => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "card";
+    b.dataset.id = f.id;
+    b.setAttribute("aria-pressed", "true");
+    b.innerHTML =
+      '<span class="mark">✓</span>' +
+      '<span class="firm">' + f.firm + '</span>' +
+      '<span class="name">' + f.name + '</span>' +
+      '<span class="desc">' + f.desc + '</span>';
+    b.addEventListener("click", () => {
+      const on = selected.has(f.id);
+      if (on) selected.delete(f.id); else selected.add(f.id);
+      b.setAttribute("aria-pressed", String(!on));
+      sync();
+    });
+    cardsEl.appendChild(b);
+  });
+
+  function sync() {
+    document.querySelectorAll(".extras .field").forEach(el => {
+      el.classList.toggle("show", selected.has(el.dataset.for));
+    });
+    const n = selected.size;
+    document.getElementById("count").textContent =
+      n === 0 ? "ما اخترت أي عدسة بعد" :
+      n === FRAMEWORKS.length ? "التقرير الشامل — العدسات الست كلها" :
+      "مختار " + n + " من " + FRAMEWORKS.length;
+  }
+
+  document.getElementById("all").addEventListener("click", () => {
+    FRAMEWORKS.forEach(f => selected.add(f.id));
+    document.querySelectorAll(".card").forEach(c => c.setAttribute("aria-pressed", "true"));
+    sync();
+  });
+  document.getElementById("none").addEventListener("click", () => {
+    selected.clear();
+    document.querySelectorAll(".card").forEach(c => c.setAttribute("aria-pressed", "false"));
+    sync();
+  });
+
+  function v(id) { return document.getElementById(id).value.trim(); }
+
+  document.getElementById("generate").addEventListener("click", () => {
+    const sym = v("symbol");
+    if (!sym) { document.getElementById("symbol").focus(); return; }
+    if (selected.size === 0) return;
+
+    const market = v("market");
+    const chosen = FRAMEWORKS.filter(f => selected.has(f.id));
+    const full = chosen.length === FRAMEWORKS.length;
+
+    let p = "";
+    p += "أنت فريق أبحاث استثماري مؤسسي متكامل يضم محللين بأساليب أكبر بيوت المال في وول ستريت.\n";
+    p += "السهم المطلوب تحليله: " + sym + (market ? " — " + market : "") + "\n";
+    p += "التاريخ: استخدم أحدث البيانات المتاحة لديك، واذكر بوضوح تاريخ آخر بيانات اعتمدت عليها.\n\n";
+    p += full
+      ? "أبي تقريرًا شاملًا يغطي الأقسام الستة التالية، كل قسم بعنوانه وجداوله:\n\n"
+      : "أبي تقريرًا يغطي " + (chosen.length === 1 ? "القسم التالي" : "الأقسام التالية") + ":\n\n";
+
+    chosen.forEach((f, i) => {
+      p += "━━━ القسم " + (i + 1) + ": " + f.name + " (بأسلوب " + f.firm + ") ━━━\n";
+      p += f.persona + "\n";
+      f.items.forEach(it => { p += "- " + it + "\n"; });
+
+      if (f.id === "ms") p += "وضعي الحالي في السهم: " + v("position") + "\n";
+      if (f.id === "jpm" && v("edate")) p += "تاريخ إعلان الأرباح: " + v("edate") + "\n";
+      if (f.id === "blk" && v("amount")) p += "مبلغ الاستثمار التقريبي: " + v("amount") + "\n";
+      if (f.id === "bw") p += "ممتلكاتي الحالية: " + (v("holdings") || "ما عندي محفظة حاليًا — قيّم السهم وحده") + "\n";
+      if (f.id === "ctdl") p += "تركيز محفظتي: " + (v("profile") || "لم أحدد — افترض مخاطرة متوسطة ومدة 3-5 سنوات") + "\n";
+      p += "\n";
+    });
+
+    p += "━━━ الخلاصة النهائية ━━━\n";
+    p += "اختم بملخص تنفيذي موحّد: القرار (شراء / احتفاظ / تجنّب" + (selected.has("ms") ? " / خطة الصفقة" : "") + ")، أهم 3 نقاط مؤيدة، أهم 3 مخاطر، ودرجة القناعة من 10.\n";
+    p += "نسّق الإجابة بعناوين وجداول واضحة بالعربي، واذكر أي أرقام غير متأكد منها بصراحة.";
+
+    document.getElementById("prompt").textContent = p;
+    const out = document.getElementById("out");
+    out.classList.add("show");
+    out.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("copied").classList.remove("show");
+  });
+
+  document.getElementById("copy").addEventListener("click", async () => {
+    const text = document.getElementById("prompt").textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const r = document.createRange();
+      r.selectNodeContents(document.getElementById("prompt"));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      document.execCommand("copy"); s.removeAllRanges();
+    }
+    const ok = document.getElementById("copied");
+    ok.classList.add("show");
+    setTimeout(() => ok.classList.remove("show"), 2500);
+  });
+
+  sync();
+</script>
