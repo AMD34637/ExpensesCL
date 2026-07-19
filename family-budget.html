@@ -6,7 +6,7 @@
 <link rel="icon" type="image/png" href="icon-192.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>ميزانية الأسرة</title>
+<title>Dowi Expenses — ميزانية الأسرة</title>
 <style>
   :root {
     --bg: #F7F5F0; --surface: #FFFFFF; --surface-2: #EFECE4; --ink: #17202E;
@@ -140,7 +140,7 @@
 
 <div class="wrap">
   <header class="top">
-    <h1>🏠 ميزانية الأسرة</h1>
+    <h1>🪙 Dowi Expenses</h1>
     <div class="month-nav">
       <button id="prev" aria-label="الشهر السابق">▶</button>
       <span id="month-label" class="num"></span>
@@ -205,6 +205,17 @@
   </section>
 
   <section class="panel">
+    <h2>☁️ الربط بقوقل شيت — المخزن السحابي</h2>
+    <p class="hint">اربط التطبيق بجدول قوقل شيت ليصبح هو المخزن: كل عملية تسجلها تنكتب في الجدول مباشرة، وكل أجهزة الأسرة المربوطة بنفس الرابط تشارك نفس الدفتر. يشتغل أوفلاين ويزامن تلقائيًا عند عودة الاتصال.</p>
+    <div class="form-grid" style="grid-template-columns: 1fr auto;">
+      <div class="f"><label for="sheet-url">رابط تطبيق الويب من Google Apps Script</label>
+        <input id="sheet-url" dir="ltr" placeholder="https://script.google.com/macros/s/.../exec" /></div>
+      <button class="ghost" id="link-sheet" style="align-self: end;">ربط</button>
+    </div>
+    <p class="hint" id="sync-status" style="margin-top: 8px;">غير مربوط — البيانات محلية في هذا الجهاز فقط.</p>
+  </section>
+
+  <section class="panel">
     <h2>الأفراد والبيانات</h2>
     <div class="members-row" id="members-list"></div>
     <div class="form-grid" style="margin-top: 10px; grid-template-columns: 200px auto 1fr;">
@@ -212,6 +223,8 @@
       <button class="ghost" id="add-member" style="align-self: end;">أضف الفرد</button>
     </div>
     <div class="io-row">
+      <button class="ghost" id="csv">⬇ ملف Excel / قوقل شيت</button>
+      <button class="ghost" id="share">↗ مشاركة ملخص الشهر</button>
       <button class="ghost" id="export">نسخة احتياطية (تصدير)</button>
       <button class="ghost" id="import">استيراد نسخة</button>
       <button class="ghost" id="wipe" style="color: var(--over); border-color: var(--over);">مسح كل البيانات</button>
@@ -233,7 +246,7 @@
   const KEY = "family-budget-v1";
   const AR_MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 
-  let state = { members: ["أنا"], budgets: {}, tx: [] };
+  let state = { members: ["عبدالله", "ثناء"], budgets: {}, tx: [] };
   let mem = false;
   try {
     const raw = localStorage.getItem(KEY);
@@ -280,6 +293,7 @@
           if (state.tx.some(t => t.member === m) && !confirm("عند " + m + " عمليات مسجلة — حذف الفرد لن يحذفها. متابعة؟")) return;
           state.members = state.members.filter(v => v !== m);
           save(); refreshMembers();
+          postOp({ action: "meta", meta: metaObj() });
         });
         c.appendChild(x);
       }
@@ -293,6 +307,7 @@
     if (!name || state.members.includes(name)) return;
     state.members.push(name);
     inp.value = ""; save(); refreshMembers();
+    postOp({ action: "meta", meta: metaObj() });
   });
 
   document.getElementById("mode-out").addEventListener("click", () => setMode("out"));
@@ -318,7 +333,7 @@
   document.getElementById("add").addEventListener("click", () => {
     const amount = parseFloat(document.getElementById("amount").value);
     if (!amount || amount <= 0) { document.getElementById("amount").focus(); return; }
-    state.tx.push({
+    const newTx = {
       id: Date.now() + Math.random().toString(16).slice(2),
       type: mode,
       date: document.getElementById("date").value || new Date().toISOString().slice(0, 10),
@@ -326,7 +341,9 @@
       member: document.getElementById("member").value,
       note: document.getElementById("note").value.trim(),
       amount
-    });
+    };
+    state.tx.push(newTx);
+    postOp({ action: "add", tx: newTx });
     document.getElementById("amount").value = "";
     document.getElementById("note").value = "";
     save(); render();
@@ -346,8 +363,139 @@
         if (val > 0) state.budgets[inp.dataset.cat] = val; else delete state.budgets[inp.dataset.cat];
       });
       save();
+      postOp({ action: "meta", meta: metaObj() });
     }
     render();
+  });
+
+  // ---- مزامنة قوقل شيت ----
+  const SYNC_KEY = "family-budget-sheet-url";
+  const PEND_KEY = "family-budget-pending";
+  let sheetUrl = "";
+  let pending = [];
+  try {
+    sheetUrl = localStorage.getItem(SYNC_KEY) || "";
+    pending = JSON.parse(localStorage.getItem(PEND_KEY) || "[]");
+  } catch (e) {}
+  function savePending() { try { localStorage.setItem(PEND_KEY, JSON.stringify(pending)); } catch (e) {} }
+  function metaObj() { return { members: state.members, budgets: state.budgets }; }
+  function migrateMembers() {
+    if (state.members.length === 1 && state.members[0] === "أنا") {
+      state.members = ["عبدالله", "ثناء"];
+      let remapped = false;
+      state.tx.forEach(t => { if (t.member === "أنا") { t.member = "عبدالله"; remapped = true; } });
+      save();
+      postOp(remapped ? { action: "full", tx: state.tx, meta: metaObj() } : { action: "meta", meta: metaObj() });
+      return true;
+    }
+    return false;
+  }
+  function syncStatus(msg) { document.getElementById("sync-status").textContent = msg; }
+  function syncUI() {
+    document.getElementById("sheet-url").value = sheetUrl;
+    document.getElementById("link-sheet").textContent = sheetUrl ? "فصل" : "ربط";
+    if (sheetUrl) syncStatus("مربوط بقوقل شيت ✓" + (pending.length ? " — " + pending.length + " عملية بانتظار المزامنة" : ""));
+    else syncStatus("غير مربوط — البيانات محلية في هذا الجهاز فقط.");
+  }
+  async function postOp(op) {
+    if (!sheetUrl) return;
+    try {
+      await fetch(sheetUrl, { method: "POST", body: JSON.stringify(op) });
+      if (pending.length) await flushPending();
+      syncUI();
+    } catch (e) { pending.push(op); savePending(); syncStatus("بدون اتصال — " + pending.length + " عملية بتتزامن تلقائيًا عند عودة النت."); }
+  }
+  async function flushPending() {
+    while (pending.length) {
+      try { await fetch(sheetUrl, { method: "POST", body: JSON.stringify(pending[0]) }); pending.shift(); savePending(); }
+      catch (e) { break; }
+    }
+  }
+  async function pullRemote() {
+    if (!sheetUrl) return;
+    const res = await fetch(sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "t=" + Date.now());
+    const data = await res.json();
+    if (data && Array.isArray(data.tx)) {
+      state.tx = data.tx;
+      if (data.meta && Array.isArray(data.meta.members) && data.meta.members.length) {
+        state.members = data.meta.members;
+        state.budgets = data.meta.budgets || {};
+      }
+      migrateMembers();
+      save(); refreshMembers(); render();
+      syncStatus("مربوط بقوقل شيت ✓ — آخر مزامنة الآن");
+    }
+  }
+  document.getElementById("link-sheet").addEventListener("click", async () => {
+    if (sheetUrl) {
+      if (!confirm("فصل الربط؟ البيانات تبقى محفوظة محليًا وفي قوقل شيت، لكن بلا مزامنة.")) return;
+      sheetUrl = "";
+      try { localStorage.removeItem(SYNC_KEY); } catch (e) {}
+      syncUI(); return;
+    }
+    const url = document.getElementById("sheet-url").value.trim();
+    if (!url.startsWith("https://script.google.com/")) {
+      syncStatus("الرابط غير صحيح — لازم يبدأ بـ https://script.google.com/ (شوف خطوات الإعداد في المحادثة).");
+      return;
+    }
+    syncStatus("جاري الربط...");
+    try {
+      const res = await fetch(url + "?t=" + Date.now());
+      const data = await res.json();
+      sheetUrl = url;
+      try { localStorage.setItem(SYNC_KEY, url); } catch (e) {}
+      if (data && Array.isArray(data.tx) && data.tx.length) {
+        const ids = new Set(state.tx.map(t => t.id));
+        data.tx.forEach(t => { if (!ids.has(t.id)) state.tx.push(t); });
+        if (data.meta && Array.isArray(data.meta.members)) {
+          data.meta.members.forEach(m => { if (!state.members.includes(m)) state.members.push(m); });
+          state.budgets = Object.assign({}, data.meta.budgets || {}, state.budgets);
+        }
+      }
+      await fetch(url, { method: "POST", body: JSON.stringify({ action: "full", tx: state.tx, meta: metaObj() }) });
+      save(); refreshMembers(); render(); syncUI();
+      syncStatus("تم الربط ✓ — قوقل شيت الآن هو المخزن، وهذا الجهاز متزامن.");
+    } catch (e) {
+      sheetUrl = "";
+      try { localStorage.removeItem(SYNC_KEY); } catch (err) {}
+      syncStatus("فشل الربط — تأكد أنك نشرت السكربت كتطبيق ويب بصلاحية «Anyone» وأن الرابط ينتهي بـ /exec.");
+    }
+  });
+  window.addEventListener("online", () => { flushPending().then(syncUI); });
+
+  document.getElementById("csv").addEventListener("click", () => {
+    if (!state.tx.length) { showHint("ما فيه عمليات مسجلة بعد — أضف عمليات ثم صدّر."); return; }
+    const esc = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+    const rows = [["التاريخ", "النوع", "الفئة/المصدر", "الفرد", "الملاحظة", "المبلغ"]];
+    [...state.tx].sort((a, b) => a.date.localeCompare(b.date)).forEach(t => {
+      rows.push([t.date, t.type === "in" ? "دخل" : "مصروف", t.cat, t.member, t.note || "", t.amount]);
+    });
+    const csv = "﻿" + rows.map(r => r.map(esc).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ميزانية-الأسرة.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    showHint("نزّل الملف ✓ — افتح sheets.google.com ثم ملف ← استيراد ← رفع، واختر الملف.");
+  });
+
+  document.getElementById("share").addEventListener("click", async () => {
+    const tx = state.tx.filter(t => t.date.startsWith(monthKey()));
+    const inSum = tx.filter(t => t.type === "in").reduce((s, t) => s + t.amount, 0);
+    const outSum = tx.filter(t => t.type === "out").reduce((s, t) => s + t.amount, 0);
+    const byCat = {};
+    tx.filter(t => t.type === "out").forEach(t => { byCat[t.cat] = (byCat[t.cat] || 0) + t.amount; });
+    const top = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([c, v]) => "• " + c + ": " + fmt(v)).join("\n");
+    const text = "📊 ملخص ميزانية الأسرة — " + AR_MONTHS[view.m] + " " + view.y + "\n" +
+      "الدخل: " + fmt(inSum) + "\nالمصاريف: " + fmt(outSum) + "\nالمتبقي: " + fmt(inSum - outSum) +
+      (top ? "\n\nأعلى المصاريف:\n" + top : "");
+    if (navigator.share) {
+      try { await navigator.share({ text }); return; } catch (e) { if (e.name === "AbortError") return; }
+    }
+    try { await navigator.clipboard.writeText(text); showHint("انسخ الملخص ✓ — الصقه في واتساب أو أي مكان."); }
+    catch (e) { showHint("المشاركة غير متاحة في هذا المتصفح."); }
   });
 
   document.getElementById("export").addEventListener("click", () => {
@@ -370,14 +518,16 @@
       if (!Array.isArray(data.tx) || !Array.isArray(data.members)) throw 0;
       state = Object.assign({ members: ["أنا"], budgets: {}, tx: [] }, data);
       save(); refreshMembers(); render();
+      postOp({ action: "full", tx: state.tx, meta: metaObj() });
       ta.classList.remove("show");
       showHint("تم الاستيراد بنجاح ✓");
     } catch (e) { showHint("النص الملصوق ليس نسخة صالحة — تأكد من لصقه كاملًا كما صُدِّر."); }
   });
   document.getElementById("wipe").addEventListener("click", () => {
-    if (!confirm("سيُمسح كل شيء نهائيًا (الأفراد والعمليات والحدود). متأكد؟")) return;
+    if (!confirm("سيُمسح كل شيء نهائيًا (الأفراد والعمليات والحدود" + (sheetUrl ? "، ومن قوقل شيت أيضًا" : "") + "). متأكد؟")) return;
     state = { members: ["أنا"], budgets: {}, tx: [] };
     save(); refreshMembers(); render();
+    postOp({ action: "full", tx: [], meta: metaObj() });
   });
   function showHint(msg) {
     const h = document.getElementById("io-hint");
@@ -471,6 +621,7 @@
       del.className = "del"; del.textContent = "✕"; del.setAttribute("aria-label", "حذف العملية");
       del.addEventListener("click", () => {
         state.tx = state.tx.filter(x => x.id !== t.id);
+        postOp({ action: "del", id: t.id });
         save(); render();
       });
       td.appendChild(del); tr.appendChild(td);
@@ -478,8 +629,11 @@
     });
   }
 
+  migrateMembers();
   refreshMembers();
   render();
+  syncUI();
+  if (sheetUrl) { flushPending().then(pullRemote).catch(() => { syncStatus("مربوط ✓ — بدون اتصال حاليًا، تعرض النسخة المحلية."); }); }
 
   if ("serviceWorker" in navigator && location.protocol === "https:") {
     navigator.serviceWorker.register("sw.js").catch(() => {});

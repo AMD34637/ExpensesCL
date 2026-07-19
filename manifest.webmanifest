@@ -1,7 +1,7 @@
 {
-  "name": "ميزانية الأسرة",
-  "short_name": "الميزانية",
-  "description": "إدارة ميزانية شهرية للأسرة: دخل ومصاريف وحدود إنفاق مع تنبيهات",
+  "name": "Dowi Expenses",
+  "short_name": "Dowi",
+  "description": "Dowi Expenses — إدارة ميزانية شهرية للأسرة: دخل ومصاريف وحدود إنفاق مع تنبيهات ومزامنة قوقل شيت",
   "lang": "ar",
   "dir": "rtl",
   "start_url": "./family-budget.html",

@@ -1,4 +1,4 @@
-const CACHE = "family-budget-v2";
+const CACHE = "family-budget-v5";
 const ASSETS = [
   "./family-budget.html",
   "./reports.html",
@@ -23,6 +23,7 @@ self.addEventListener("activate", e => {
 
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
+  if (new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(hit => {
       const fetched = fetch(e.request)
