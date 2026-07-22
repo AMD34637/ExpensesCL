@@ -133,6 +133,18 @@
   .hero .scope { font-size: 0.85rem; opacity: .8; }
   .hero .wallet { position: absolute; left: 26px; bottom: 22px; opacity: .9; }
 
+  .actions { display: flex; gap: 10px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+  .act {
+    display: inline-flex; align-items: center; gap: 7px; font-family: inherit; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    color: var(--ink); padding: 10px 18px; font-size: 0.92rem; font-weight: 700; box-shadow: var(--shadow);
+  }
+  .act:hover { border-color: var(--accent); color: var(--accent); }
+  .act span { font-size: 1.05rem; }
+  .sync-pill { margin-inline-start: auto; font-size: 0.9rem; color: var(--ink-soft); }
+  .sync-pill.on { color: var(--ok); }
+  .sync-pill.pend { color: var(--near); }
+
   .grid { display: grid; gap: 12px; margin-top: 12px; }
   .g3 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
   .g4 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
@@ -350,6 +362,12 @@
     <svg class="wallet" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1h1a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="17" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
   </div>
 
+  <div class="actions">
+    <button class="act" id="open-sheet"><span>📊</span> افتح قوقل شيت</button>
+    <button class="act" id="dl-report"><span>📄</span> حمّل التقرير</button>
+    <span class="sync-pill" id="sync-pill" title="حالة المزامنة">●</span>
+  </div>
+
   <div class="grid g3">
     <div class="card stat i-abd">
       <div class="top"><span class="k">الدخل الأساسي</span><span class="badge" style="background:var(--abd)">ع</span></div>
@@ -555,16 +573,26 @@
   function savePending() { try { localStorage.setItem(PEND_KEY, JSON.stringify(pending)); } catch (e) {} }
   function metaObj() { return { members: state.members, budgets: state.budgets, needs: state.needs, installments: state.installments }; }
   function syncStatus(msg) { $("sync-status").textContent = msg; }
+  var SHEETVIEW_KEY = "family-budget-sheet-view";
+  var sheetViewUrl = "";
+  try { sheetViewUrl = localStorage.getItem(SHEETVIEW_KEY) || ""; } catch (e) {}
+  function setSheetView(url) {
+    if (url && /^https?:\/\//.test(url)) { sheetViewUrl = url; try { localStorage.setItem(SHEETVIEW_KEY, url); } catch (e) {} }
+  }
   function syncUI() {
     $("sheet-url").value = sheetUrl;
     $("link-sheet").textContent = sheetUrl ? "فصل" : "ربط";
     var sum = $("sync-sum");
+    var pill = $("sync-pill");
     if (sheetUrl) {
       syncStatus("مربوط بقوقل شيت ✓" + (pending.length ? " — " + pending.length + " عملية بانتظار المزامنة" : ""));
       sum.textContent = pending.length ? "☁️ قوقل شيت: بانتظار المزامنة (" + pending.length + ")" : "☁️ قوقل شيت: متزامن ✓";
+      pill.className = "sync-pill " + (pending.length ? "pend" : "on");
+      pill.title = pending.length ? "بانتظار المزامنة (" + pending.length + ")" : "متزامن مع قوقل شيت";
     } else {
       syncStatus("غير مربوط — البيانات محلية في هذا الجهاز فقط.");
       sum.textContent = "☁️ قوقل شيت: غير مربوط";
+      pill.className = "sync-pill"; pill.title = "غير مربوط";
     }
   }
   function postOp(op) {
@@ -594,6 +622,7 @@
             if (Array.isArray(data.meta.installments)) state.installments = data.meta.installments;
           }
           state.tx.forEach(function(t){ if (t.member === "أنا") t.member = "عبدالله"; });
+          if (data.sheetUrl) setSheetView(data.sheetUrl);
           save(); render();
           syncStatus("مربوط بقوقل شيت ✓ — آخر مزامنة الآن");
         }
@@ -622,6 +651,7 @@
         var nids = {}; state.needs.forEach(function(n){ nids[n.id] = 1; });
         data.meta.needs.forEach(function(n){ if (!nids[n.id]) state.needs.push(n); });
       }
+      if (data && data.sheetUrl) setSheetView(data.sheetUrl);
       return fetch(url, { method: "POST", body: JSON.stringify({ action: "full", tx: state.tx, meta: metaObj() }) });
     }).then(function(){
       save(); render(); syncUI();
@@ -638,6 +668,89 @@
     if (sheetUrl) { syncStatus("جاري المزامنة..."); flushPending().then(pullRemote).then(syncUI).catch(function(){}); toast("جاري المزامنة ☁️"); }
     else { render(); toast("تم التحديث"); }
   });
+
+  /* open google sheet */
+  $("open-sheet").addEventListener("click", function(){
+    var v = sheetViewUrl;
+    if (!v) {
+      v = prompt("الصق رابط جدول قوقل شيت (من شريط عنوان الجدول — يبدأ بـ https://docs.google.com/spreadsheets):", "");
+      if (v) { setSheetView(v.trim()); v = sheetViewUrl; }
+    }
+    if (v) { window.open(v, "_blank"); }
+    else { toast("اربط قوقل شيت أول من قسم ☁️ تحت"); document.querySelector("details.card").setAttribute("open", ""); document.querySelector("details.card").scrollIntoView({ behavior: "smooth" }); }
+  });
+
+  /* download report based on current view */
+  $("dl-report").addEventListener("click", buildAndDownloadReport);
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function buildAndDownloadReport() {
+    var mk = monthKey();
+    var monthTx = state.tx.filter(function(t){ return t.date.indexOf(mk) === 0; });
+    var byPerson = function(t){ return !statsFilter || t.member === statsFilter; };
+    var tx = monthTx.filter(byPerson);
+    var scope = statsFilter || "كل العائلة";
+    var inTx = tx.filter(function(t){ return t.type === "in"; });
+    var outTx = tx.filter(function(t){ return t.type === "out"; });
+    var inSum = inTx.reduce(function(s,t){ return s + t.amount; }, 0);
+    var outSum = outTx.reduce(function(s,t){ return s + t.amount; }, 0);
+    var oblig = state.installments.reduce(function(s,it){ return s + (it.amount || 0); }, 0);
+    var byCat = {}; outTx.forEach(function(t){ byCat[t.cat] = (byCat[t.cat]||0) + t.amount; });
+    var catRows = Object.keys(byCat).map(function(k){ return [k, byCat[k]]; }).sort(function(a,b){ return b[1]-a[1]; });
+    var abdIn = monthTx.filter(function(t){ return t.type === "in" && t.member === "عبدالله"; }).reduce(function(s,t){ return s+t.amount; }, 0);
+    var thnIn = monthTx.filter(function(t){ return t.type === "in" && t.member === "ثناء"; }).reduce(function(s,t){ return s+t.amount; }, 0);
+    var abdOut = monthTx.filter(function(t){ return t.type === "out" && t.member === "عبدالله"; }).reduce(function(s,t){ return s+t.amount; }, 0);
+    var thnOut = monthTx.filter(function(t){ return t.type === "out" && t.member === "ثناء"; }).reduce(function(s,t){ return s+t.amount; }, 0);
+
+    var rowsHtml = tx.slice().sort(function(a,b){ return b.date.localeCompare(a.date); }).map(function(t){
+      return "<tr><td>" + esc(t.date) + "</td><td>" + (t.type === "in" ? "دخل" : "مصروف") + "</td><td>" + esc(t.cat) +
+        "</td><td>" + esc(t.member) + "</td><td>" + esc(t.note || "—") + '</td><td class="n">' + (t.type === "in" ? "+" : "−") + fmt(t.amount) + "</td></tr>";
+    }).join("");
+    var catHtml = catRows.map(function(e){
+      return "<tr><td>" + esc(e[0]) + '</td><td class="n">' + fmt(e[1]) + '</td><td class="n">' + (outSum ? Math.round(e[1]/outSum*100) : 0) + "%</td></tr>";
+    }).join("");
+    var instHtml = state.installments.map(function(it){
+      var paid = it.paid && it.paid[mk];
+      return "<tr><td>" + esc(it.name) + "</td><td>" + (it.kind === "قسط" ? "قسط ثابت" : "فاتورة") + '</td><td class="n">' + fmt(it.amount) +
+        "</td><td>" + (paid ? "مدفوع ✓" : "غير مدفوع") + "</td></tr>";
+    }).join("");
+
+    var doc = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1"><title>تقرير ' + esc(AR_MONTHS[view.m] + " " + view.y) + '</title>' +
+      '<style>body{font-family:"Segoe UI","Geeza Pro",Tahoma,system-ui,sans-serif;color:#24121F;background:#fff;margin:0;padding:28px;line-height:1.7}' +
+      '.wrap{max-width:800px;margin:0 auto}h1{color:#602650;margin:0 0 2px;font-size:1.6rem}.sub{color:#6E5567;margin:0 0 20px}' +
+      '.cards{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}.c{border:1px solid #E6D5E0;border-radius:12px;padding:12px 16px;min-width:130px}' +
+      '.c .k{font-size:.8rem;color:#6E5567}.c .v{font-size:1.3rem;font-weight:800}.c .v.g{color:#2E7D5B}.c .v.r{color:#B04A42}' +
+      'h2{color:#602650;font-size:1.05rem;margin:22px 0 8px;border-bottom:2px solid #F0E5EC;padding-bottom:4px}' +
+      'table{width:100%;border-collapse:collapse;font-size:.88rem}th,td{border-bottom:1px solid #eee;padding:7px 9px;text-align:right}' +
+      'th{color:#6E5567;font-size:.78rem}td.n{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}' +
+      '.foot{margin-top:26px;color:#9a8391;font-size:.78rem;text-align:center}' +
+      '@media print{.noprint{display:none}body{padding:0}}' +
+      '.btn{background:#602650;color:#fff;border:none;border-radius:9px;padding:10px 22px;font-size:.95rem;cursor:pointer;font-family:inherit}</style></head><body><div class="wrap">' +
+      '<div class="noprint" style="text-align:left;margin-bottom:10px"><button class="btn" onclick="window.print()">🖨️ طباعة / حفظ PDF</button></div>' +
+      '<h1>TAD — تقرير الميزانية</h1><p class="sub">دفتر عبدالله و ثناء · ' + esc(AR_MONTHS[view.m] + " " + view.y) + ' · نطاق التقرير: ' + esc(scope) + '</p>' +
+      '<div class="cards">' +
+      '<div class="c"><div class="k">إجمالي الدخل</div><div class="v g">' + fmt(inSum) + '</div></div>' +
+      '<div class="c"><div class="k">إجمالي المصروفات</div><div class="v">' + fmt(outSum) + '</div></div>' +
+      '<div class="c"><div class="k">المتبقي</div><div class="v ' + (inSum-outSum < 0 ? "r" : "g") + '">' + fmt(inSum-outSum) + '</div></div>' +
+      '<div class="c"><div class="k">المستحقات الشهرية</div><div class="v">' + fmt(oblig) + '</div></div>' +
+      '</div>' +
+      '<h2>الدخل والمصروف حسب الفرد</h2><table><tr><th>الفرد</th><th>الدخل</th><th>المصروف</th></tr>' +
+      '<tr><td>عبدالله</td><td class="n">' + fmt(abdIn) + '</td><td class="n">' + fmt(abdOut) + '</td></tr>' +
+      '<tr><td>ثناء</td><td class="n">' + fmt(thnIn) + '</td><td class="n">' + fmt(thnOut) + '</td></tr></table>' +
+      (catHtml ? '<h2>المصروفات حسب الفئة</h2><table><tr><th>الفئة</th><th>المبلغ</th><th>النسبة</th></tr>' + catHtml + '</table>' : "") +
+      (instHtml ? '<h2>الأقساط والفواتير</h2><table><tr><th>الاسم</th><th>النوع</th><th>المبلغ</th><th>حالة الشهر</th></tr>' + instHtml + '</table>' : "") +
+      '<h2>سجل العمليات (' + tx.length.toLocaleString("ar-SA") + ')</h2><table><tr><th>التاريخ</th><th>النوع</th><th>الفئة</th><th>سجّلها</th><th>ملاحظة</th><th>المبلغ</th></tr>' + (rowsHtml || '<tr><td colspan="6">لا عمليات</td></tr>') + '</table>' +
+      '<p class="foot">أُنشئ من تطبيق TAD Expenses · ' + esc(new Date().toLocaleString("ar-SA")) + '</p>' +
+      '</div></body></html>';
+
+    var blob = new Blob([doc], { type: "text/html;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "تقرير-" + AR_MONTHS[view.m] + "-" + view.y + (statsFilter ? "-" + statsFilter : "") + ".html";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+    toast("تم تحميل التقرير 📄 — افتحه واطبعه PDF");
+  }
 
   /* ---------- theme ---------- */
   $("theme").addEventListener("click", function(){

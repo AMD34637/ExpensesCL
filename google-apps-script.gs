@@ -50,7 +50,9 @@ function doGet() {
   });
   var meta = {};
   try { meta = JSON.parse(_meta().getRange(1, 1).getValue() || "{}"); } catch (e) {}
-  return _json({ tx: tx, meta: meta });
+  var sheetUrl = "";
+  try { sheetUrl = _ss().getUrl(); } catch (e) {}
+  return _json({ tx: tx, meta: meta, sheetUrl: sheetUrl });
 }
 
 function doPost(e) {
