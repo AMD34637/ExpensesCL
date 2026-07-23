@@ -228,7 +228,6 @@
 <div class="shell">
   <header class="topbar">
     <div class="brand">
-      <span class="mark" aria-hidden="true">مصر</span>
       <div class="wm"><div class="eyebrow">تطبيق الميزانية الشخصية</div><h1>مصروفاتي</h1></div>
     </div>
     <div class="topbar-actions">
@@ -351,9 +350,10 @@
 <dialog id="dlgSaving"></dialog>
 <dialog id="dlgReceipt"></dialog>
 <dialog id="dlgSheet"></dialog>
-<input type="file" id="camInput" accept="image/*" capture="environment" style="display:none" />
-<input type="file" id="libInput" accept="image/*" style="display:none" />
+<input type="file" id="receiptInput" accept="image/*" style="display:none" />
 
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
+<script src="parse.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

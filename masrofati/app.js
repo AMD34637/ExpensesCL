@@ -10,6 +10,9 @@ var EXP_CATS = [
 var INC_SOURCES = ["راتب","مكافأة","عمل إضافي","بيع","استرداد","دخل آخر"];
 var PAY_METHODS = ["مدى","بطاقة ائتمان","نقدًا","تحويل","Apple Pay","أخرى"];
 var COMMIT_CATS = ["إيجار","قرض","اشتراك","فاتورة","قسط","التزام عائلي","التزام آخر"];
+var OWNERS = ["مشترك","عبدالله","ثناء"];
+function accounts(){ if (!Array.isArray(state.meta.accounts) || !state.meta.accounts.length) state.meta.accounts = ["الحساب الرئيسي","نقدًا","حساب بنكي"]; return state.meta.accounts; }
+function ownerDefault(){ try { return localStorage.getItem("masrofati-owner") || "مشترك"; } catch(e){ return "مشترك"; } }
 var EXP_ICON = {}; EXP_CATS.forEach(function(c){ EXP_ICON[c[0]] = c[1]; });
 var AR_MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 
@@ -38,12 +41,16 @@ function nowISO(){ return new Date().toISOString(); }
 function todayStr(){ return new Date().toISOString().slice(0, 10); }
 function num(v){ var n = parseFloat(v); return isFinite(n) ? n : 0; }
 function fmt(n){ return (Number(n) || 0).toLocaleString("ar-SA", { maximumFractionDigits: 2 }) + " ر.س"; }
-function fmtG(dateStr){ // Gregorian dd/mm/yyyy
+var GREG = "en-GB-u-ca-gregory";
+function fmtG(dateStr){ // Gregorian dd/mm/yyyy — never Hijri
   if (!dateStr) return "—";
-  var p = String(dateStr).slice(0, 10).split("-");
-  if (p.length !== 3) return dateStr;
-  return p[2] + "/" + p[1] + "/" + p[0];
+  var iso = String(dateStr).slice(0, 10);
+  var d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())){ var p = iso.split("-"); return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : dateStr; }
+  try { return new Intl.DateTimeFormat(GREG, { day: "2-digit", month: "2-digit", year: "numeric" }).format(d); }
+  catch(e){ var q = iso.split("-"); return q[2] + "/" + q[1] + "/" + q[0]; }
 }
+function validGregorian(v){ return /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v + "T00:00:00").getTime()); }
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
 function toast(msg, err){ var t = $("toast"); t.textContent = msg; t.className = err ? "show err" : "show"; clearTimeout(toast._h); toast._h = setTimeout(function(){ t.className = ""; }, 2200); }
 
@@ -62,9 +69,13 @@ function syncDots(){
     else { dot.className = "sync-dot on"; txt.textContent = "مربوط ومتزامن مع قوقل شيت ✓"; }
   } else { dot.className = "sync-dot"; txt.textContent = "غير مربوط بقوقل شيت — البيانات محلية"; }
 }
+function snapshotEmpty(s){ return !(s.tx.length || s.invoices.length || s.commitments.length || s.savings.length); }
 function pushSnapshot(){ // full snapshot upsert; safe against duplicates because keyed by ids server-side
   if (!sheetUrl) return Promise.resolve();
-  var body = JSON.stringify({ action: "full", data: snapshot() });
+  var snap = snapshot();
+  // حماية: لا تكتب لقطة فارغة فوق بيانات سحابية صحيحة إلا بعد مسح/استيراد صريح
+  if (snapshotEmpty(snap) && !state.meta._allowEmptyPush) { syncDots(); return Promise.resolve(); }
+  var body = JSON.stringify({ action: "full", data: snap });
   return fetch(sheetUrl, { method: "POST", body: body })
     .then(function(){ pending = []; savePending(); syncDots(); })
     .catch(function(){ pending = [{ action: "full" }]; savePending(); syncDots(); });
@@ -86,7 +97,7 @@ function pullSheet(){
 
 /* ---------- CENTRAL CALCULATION ENGINE ---------- */
 function txForMonth(mk){ return state.tx.filter(function(t){ return t.monthKey === mk; }); }
-function primaryTx(mk){ return state.tx.filter(function(t){ return t.type === "income" && t.incomeType === "primary" && t.monthKey === mk; })[0] || null; }
+function primaryTx(mk, owner){ return state.tx.filter(function(t){ return t.type === "income" && t.incomeType === "primary" && t.monthKey === mk && (owner == null || (t.owner || "مشترك") === owner); })[0] || null; }
 function commitmentsForMonth(mk){
   return state.commitments.filter(function(c){
     if (c.recurring) return true;              // recurring counts every month
@@ -172,6 +183,8 @@ function openAdd(type, editId){
     + '<button data-t="income" class="' + (t === "income" ? "on inc" : "") + '">دخل</button></div>'
     + '<form id="axForm" novalidate>'
     + '<label class="field"><span class="lab">المبلغ (ر.س)</span><input id="axAmount" type="number" inputmode="decimal" step="0.01" min="0.01" required value="' + (editing ? editing.amount : "") + '" /></label>'
+    + '<div class="two"><label class="field"><span class="lab">المالك</span><select id="axOwner">' + OWNERS.map(function(o){ return '<option ' + ((editing ? (editing.owner||"مشترك") : ownerDefault()) === o ? "selected" : "") + '>' + o + '</option>'; }).join("") + '</select></label>'
+    + '<label class="field"><span class="lab">الحساب</span><select id="axAccount">' + accounts().map(function(a){ return '<option ' + (editing && editing.account === a ? "selected" : "") + '>' + a + '</option>'; }).join("") + '</select></label></div>'
     + '<div id="axIncomeWrap" style="display:' + (t === "income" ? "block" : "none") + '">'
       + '<label class="field"><span class="lab">نوع الدخل</span>'
       + '<div class="seg" id="axIncType">'
@@ -206,12 +219,14 @@ function openAdd(type, editId){
   drawCats();
 
   var curType = t, curIncType = incType;
+  function currentOwner(){ return $("axOwner") ? $("axOwner").value : "مشترك"; }
   function refreshPrimHint(){
     var h = $("axPrimHint"); if (!h) return;
-    if (curType === "income" && curIncType === "primary" && existingPrimary && (!editing || editing.id !== existingPrimary.id)) {
-      h.textContent = "يوجد دخل رئيسي لهذا الشهر (" + fmt(existingPrimary.amount) + ") — سيتم تحديثه بدل إضافة نسخة مكررة.";
+    var ep = primaryTx(monthKey(), currentOwner());
+    if (curType === "income" && curIncType === "primary" && ep && (!editing || editing.id !== ep.id)) {
+      h.textContent = "يوجد دخل رئيسي لـ" + currentOwner() + " هذا الشهر (" + fmt(ep.amount) + ") — سيُحدَّث بدل تكراره.";
       h.style.color = "var(--warn)";
-    } else { h.textContent = "الدخل الرئيسي واحد لكل شهر."; h.style.color = "var(--muted)"; }
+    } else { h.textContent = "الدخل الرئيسي واحد لكل مالك في الشهر."; h.style.color = "var(--muted)"; }
   }
   refreshPrimHint();
 
@@ -227,6 +242,7 @@ function openAdd(type, editId){
   dlg.querySelectorAll("#axIncType button").forEach(function(b){
     b.onclick = function(){ curIncType = b.getAttribute("data-k"); dlg.querySelectorAll("#axIncType button").forEach(function(x){ x.className = x === b ? "on" : ""; }); refreshPrimHint(); };
   });
+  $("axOwner").onchange = refreshPrimHint;
   $("axClose").onclick = function(){ dlg.close(); };
   if ($("axCancel")) $("axCancel").onclick = function(){ dlg.close(); };
   if ($("axDelete")) $("axDelete").onclick = function(){ if (confirm("حذف هذه العملية نهائيًا؟")) { deleteTx(editing.id); dlg.close(); toast("تم الحذف"); } };
@@ -238,28 +254,29 @@ function openAdd(type, editId){
     var amount = num($("axAmount").value);
     var date = $("axDate").value;
     if (amount <= 0) { toast("أدخل مبلغًا صحيحًا", true); return; }
-    if (!date) { toast("أدخل التاريخ", true); return; }
+    if (!validGregorian(date)) { toast("تاريخ ميلادي غير صحيح (YYYY-MM-DD)", true); return; }
     submitting = true; $("axSave").disabled = true;
 
+    var owner = currentOwner(), account = $("axAccount") ? $("axAccount").value : "";
     if (curType === "income") {
       if (curIncType === "primary") {
-        var existing = existingPrimary;
+        var existing = primaryTx(monthKey(), owner);
         var target = editing && editing.id ? editing : (existing || {});
-        target.type = "income"; target.incomeType = "primary";
+        target.type = "income"; target.incomeType = "primary"; target.owner = owner; target.account = account;
         target.amount = amount; target.date = date; target.category = $("axSource").value;
         target.notes = $("axNotes").value.trim(); target.source = "manual";
         saveTx(target);
         toast(existing && (!editing || editing.id !== existing.id) ? "تم تحديث الدخل الرئيسي ✓" : "تم الحفظ ✓");
       } else {
         var inc = editing && editing.id ? editing : {};
-        inc.type = "income"; inc.incomeType = "additional";
+        inc.type = "income"; inc.incomeType = "additional"; inc.owner = owner; inc.account = account;
         inc.amount = amount; inc.date = date; inc.category = $("axSource").value;
         inc.notes = $("axNotes").value.trim(); inc.source = "manual";
         saveTx(inc); toast("تم حفظ الدخل ✓");
       }
     } else {
       var ex = editing && editing.id ? editing : {};
-      ex.type = "expense"; delete ex.incomeType;
+      ex.type = "expense"; delete ex.incomeType; ex.owner = owner; ex.account = account;
       ex.amount = amount; ex.date = date; ex.category = selCat;
       ex.merchant = $("axMerchant").value.trim(); ex.paymentMethod = $("axPay").value;
       ex.notes = $("axNotes").value.trim(); if (!ex.source) ex.source = "manual";
@@ -306,53 +323,137 @@ function openDetail(id){
 $("qaReceipt").onclick = openReceiptChooser;
 function openReceiptChooser(){
   var dlg = $("dlgReceipt");
+  // زر واحد فقط + مدخل واحد (accept=image/* بلا capture) => المتصفح يعرض: تصوير/المكتبة/ملف
   dlg.innerHTML = '<div class="sheet"><div class="sheet-grip"></div>'
     + '<div class="sheet-head"><h3>مسح فاتورة</h3><button class="icon-btn" id="rcClose" aria-label="إغلاق">✕</button></div>'
-    + '<p class="meta" style="color:var(--muted);margin-bottom:14px">التقط صورة الفاتورة أو اخترها من الجهاز، ثم راجع البيانات قبل الحفظ.</p>'
-    + '<button class="btn primary block" id="rcCam" style="margin-bottom:10px">📷 التصوير بالكاميرا</button>'
-    + '<button class="btn soft block" id="rcLib">🖼️ اختيار صورة من الجهاز</button>'
-    + '<button class="btn ghost block" id="rcManual" style="margin-top:10px">✍️ إدخال فاتورة يدويًا بدون صورة</button>'
+    + '<p class="meta" style="color:var(--muted);margin-bottom:14px">اضغط الزر ثم اختر «التقاط صورة» أو «مكتبة الصور» أو «ملف». نقرأ الفاتورة تلقائيًا ونعرضها للمراجعة قبل الحفظ.</p>'
+    + '<button class="btn primary block" id="rcPick">🧾 تصوير أو اختيار الفاتورة</button>'
+    + '<div id="rcProgress" style="display:none;margin-top:14px">'
+      + '<div class="ptrack" style="background:var(--surface-2)"><div class="pbar" id="rcBar" style="background:var(--primary)"></div></div>'
+      + '<div class="meta" id="rcStatus" style="color:var(--muted);font-size:12px;margin-top:6px">…</div></div>'
+    + '<div style="text-align:center;margin-top:14px"><button class="text-btn" id="rcManual">إدخال فاتورة يدويًا بدون صورة</button></div>'
     + '</div>';
   dlg.showModal();
   $("rcClose").onclick = function(){ dlg.close(); };
-  $("rcCam").onclick = function(){ $("camInput").click(); };
-  $("rcLib").onclick = function(){ $("libInput").click(); };
-  $("rcManual").onclick = function(){ dlg.close(); openReceiptReview(null); };
+  $("rcPick").onclick = function(){ $("receiptInput").click(); };
+  $("rcManual").onclick = function(){ dlg.close(); openReceiptReview(null, null); };
 }
-function handleImage(file){
-  if (!file) return;
-  var reader = new FileReader();
-  reader.onload = function(){ $("dlgReceipt").close(); openReceiptReview(reader.result); };
-  reader.onerror = function(){ toast("تعذّرت قراءة الصورة", true); };
-  reader.readAsDataURL(file);
-}
-$("camInput").onchange = function(){ handleImage(this.files[0]); this.value = ""; };
-$("libInput").onchange = function(){ handleImage(this.files[0]); this.value = ""; };
+function ocrProgress(pct, msg){ var p = $("rcProgress"), b = $("rcBar"), s = $("rcStatus"); if (!p) return; p.style.display = "block"; b.style.width = Math.max(3, Math.min(100, pct)) + "%"; s.textContent = msg; }
 
-function openReceiptReview(imgData){
+$("receiptInput").onchange = function(){ var f = this.files[0]; this.value = ""; if (f) runOCR(f); };
+
+// معالجة الصورة عبر Canvas: توجيه/تحجيم/رمادي/تباين + حد للبكسلات
+function preprocessImage(file){
+  return new Promise(function(resolve, reject){
+    var reader = new FileReader();
+    reader.onerror = function(){ reject(new Error("read")); };
+    reader.onload = function(){
+      var dataUrl = reader.result;
+      var img = new Image();
+      img.onload = function(){
+        var maxPixels = 1600 * 1600;            // حد لتفادي انهيار ذاكرة iPhone
+        var w = img.naturalWidth, h = img.naturalHeight;
+        var scale = Math.min(1, Math.sqrt(maxPixels / (w * h)));
+        // لا نصغّر الفواتير الطويلة أكثر من اللازم
+        var cw = Math.max(600, Math.round(w * scale)), ch = Math.round(h * (Math.max(600, Math.round(w*scale)) / w));
+        var cv = document.createElement("canvas"); cv.width = cw; cv.height = ch;
+        var ctx = cv.getContext("2d");
+        ctx.drawImage(img, 0, 0, cw, ch);
+        try {
+          var im = ctx.getImageData(0, 0, cw, ch), d = im.data;
+          for (var i = 0; i < d.length; i += 4){
+            var g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+            g = (g - 128) * 1.35 + 128;          // تباين
+            g = g < 0 ? 0 : g > 255 ? 255 : g;
+            d[i] = d[i+1] = d[i+2] = g;           // رمادي
+          }
+          ctx.putImageData(im, 0, 0);
+        } catch(e){ /* تجاهل لو تعذّر */ }
+        resolve({ canvas: cv, dataUrl: dataUrl });
+      };
+      img.onerror = function(){ reject(new Error("image")); };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function runOCR(file){
+  ocrProgress(5, "جاري تحسين الصورة…");
+  var origData = null;
+  preprocessImage(file).then(function(pre){
+    origData = pre.dataUrl;
+    if (typeof Tesseract === "undefined"){
+      ocrProgress(100, "المكتبة غير متاحة — انتقل للمراجعة اليدوية");
+      setTimeout(function(){ $("dlgReceipt").close(); openReceiptReview(origData, null); toast("تعذّر تحميل قارئ النص — راجع يدويًا", true); }, 600);
+      return;
+    }
+    ocrProgress(15, "جاري تجهيز القارئ (عربي + إنجليزي)…");
+    Tesseract.recognize(pre.canvas, "ara+eng", {
+      logger: function(m){ if (m.status === "recognizing text") ocrProgress(20 + Math.round(m.progress * 75), "جاري القراءة… " + Math.round(m.progress * 100) + "%"); }
+    }).then(function(res){
+      ocrProgress(100, "تمت القراءة — جاري التحليل…");
+      var text = (res && res.data && res.data.text) || "";
+      var parsed = window.ReceiptParser ? window.ReceiptParser.parseReceipt(text) : null;
+      setTimeout(function(){ $("dlgReceipt").close(); openReceiptReview(origData, parsed, text); }, 400);
+    }).catch(function(){
+      ocrProgress(100, "تعذّرت القراءة");
+      setTimeout(function(){ $("dlgReceipt").close(); openReceiptReview(origData, null); toast("تعذّرت قراءة النص — راجع يدويًا", true); }, 600);
+    });
+  }).catch(function(){
+    $("dlgReceipt").close(); openReceiptReview(null, null); toast("تعذّرت قراءة الصورة", true);
+  });
+}
+
+function openReceiptReview(imgData, parsed, rawText){
   var dlg = $("dlgReceipt");
-  var items = [{ name: "", qty: 1, price: "" }];
+  var isPayment = parsed && parsed.type === "payment";
+  var items = (parsed && parsed.items && parsed.items.length)
+    ? parsed.items.map(function(it){ return { name: it.name, qty: it.quantity, price: it.unitPrice }; })
+    : [{ name: "", qty: 1, price: "" }];
+  var pTotal = parsed && parsed.total != null ? parsed.total : "";
+  var pSub = parsed && parsed.subtotal != null ? parsed.subtotal : "";
+  var pVat = parsed && parsed.vat != null ? parsed.vat : "";
+  var pDisc = parsed && parsed.discount != null ? parsed.discount : "";
+  var confirmedMismatch = false;
+
+  var banner = parsed
+    ? (isPayment
+        ? '<div class="alert warn"><span class="ic">💳</span><span>تم التعرّف على <b>إيصال دفع بنكي</b> — سيُحفظ كعملية مصروف واحدة (بلا أصناف). راجع المبلغ والتاجر.</span></div>'
+        : '<div class="alert warn"><span class="ic">🧾</span><span>تم التعرّف على <b>فاتورة تجزئة</b> — راجع الأصناف والإجمالي قبل الحفظ.</span></div>')
+    : '<div class="alert warn"><span class="ic">✍️</span><span>راجع الحقول يدويًا — لن يُحفظ شيء تلقائيًا.</span></div>';
+
   dlg.innerHTML = '<div class="sheet"><div class="sheet-grip"></div>'
     + '<div class="sheet-head"><h3>مراجعة الفاتورة</h3><button class="icon-btn" id="rvClose" aria-label="إغلاق">✕</button></div>'
-    + '<div class="alert warn"><span class="ic">⚠️</span><span>راجع كل الحقول وصحّحها قبل الحفظ — لن يُحفظ شيء تلقائيًا. الحقول المميزة تحتاج تدقيقك.</span></div>'
+    + banner
     + (imgData ? '<img class="rcpt-preview" src="' + imgData + '" alt="الفاتورة" style="margin-bottom:12px" />' : "")
     + '<form id="rvForm" novalidate>'
-    + '<label class="field"><span class="lab">اسم التاجر</span><input id="rvMerchant" class="flag" placeholder="اكتب اسم المتجر" /></label>'
-    + '<div class="two"><label class="field"><span class="lab">تاريخ الفاتورة (ميلادي)</span><input id="rvDate" class="flag" type="date" value="' + todayStr() + '" /></label>'
-    + '<label class="field"><span class="lab">الفئة</span><select id="rvCat">' + EXP_CATS.map(function(c){ return '<option>' + c[0] + '</option>'; }).join("") + '</select></label></div>'
-    + '<div class="sec-h" style="margin:6px 2px"><h3>الأصناف</h3><button type="button" class="text-btn" id="rvAddItem">+ صنف</button></div>'
-    + '<div id="rvItems"></div>'
-    + '<div class="two"><label class="field"><span class="lab">الإجمالي الفرعي</span><input id="rvSub" type="number" inputmode="decimal" step="0.01" placeholder="0" /></label>'
-    + '<label class="field"><span class="lab">الضريبة (15%)</span><input id="rvVat" type="number" inputmode="decimal" step="0.01" placeholder="0" /></label></div>'
-    + '<label class="field"><span class="lab">الإجمالي النهائي</span><input id="rvTotal" class="flag" type="number" inputmode="decimal" step="0.01" placeholder="0" required /></label>'
-    + '<div class="rsum" id="rvCheck"><span>مجموع الأصناف</span><span class="num" id="rvItemsSum">٠ ر.س</span></div>'
-    + '<button type="submit" class="btn primary block" id="rvSave" style="margin-top:12px">مراجعة وحفظ الفاتورة</button>'
+    + '<label class="field"><span class="lab">اسم التاجر</span><input id="rvMerchant" class="' + (parsed && parsed.merchant ? "" : "flag") + '" value="' + esc(parsed ? (parsed.merchant||"") : "") + '" placeholder="اكتب اسم المتجر" /></label>'
+    + '<div class="two"><label class="field"><span class="lab">رقم المرجع <span class="hint">(اختياري)</span></span><input id="rvRef" value="' + esc(parsed ? (parsed.reference||"") : "") + '" /></label>'
+    + '<label class="field"><span class="lab">الوقت <span class="hint">(اختياري)</span></span><input id="rvTime" value="' + esc(parsed ? (parsed.time||"") : "") + '" placeholder="00:00" /></label></div>'
+    + '<div class="two"><label class="field"><span class="lab">التاريخ الميلادي</span><input id="rvDate" class="' + (parsed && parsed.date ? "" : "flag") + '" type="date" value="' + (parsed && parsed.date ? parsed.date : todayStr()) + '" required /></label>'
+    + '<label class="field"><span class="lab">المالك</span><select id="rvOwner">' + OWNERS.map(function(o){ return '<option ' + (o === ownerDefault() ? "selected" : "") + '>' + o + '</option>'; }).join("") + '</select></label></div>'
+    + '<div class="two"><label class="field"><span class="lab">الفئة</span><select id="rvCat">' + EXP_CATS.map(function(c){ return '<option>' + c[0] + '</option>'; }).join("") + '</select></label>'
+    + '<label class="field"><span class="lab">الحساب</span><select id="rvAccount">' + accounts().map(function(a){ return '<option>' + a + '</option>'; }).join("") + '</select></label></div>'
+    + '<div class="two"><label class="field"><span class="lab">طريقة الدفع</span><select id="rvPay"><option value="">—</option>' + PAY_METHODS.map(function(p){ return '<option>' + p + '</option>'; }).join("") + '</select></label>'
+    + '<label class="field"><span class="lab">الخصم <span class="hint">(اختياري)</span></span><input id="rvDisc" type="number" inputmode="decimal" step="0.01" value="' + pDisc + '" placeholder="0" /></label></div>'
+    + '<div id="rvItemsWrap" style="display:' + (isPayment ? "none" : "block") + '">'
+      + '<div class="sec-h" style="margin:6px 2px"><h3>الأصناف</h3><button type="button" class="text-btn" id="rvAddItem">+ صنف</button></div>'
+      + '<div id="rvItems"></div>'
+      + '<div class="two"><label class="field"><span class="lab">الإجمالي الفرعي</span><input id="rvSub" type="number" inputmode="decimal" step="0.01" value="' + pSub + '" placeholder="0" /></label>'
+      + '<label class="field"><span class="lab">الضريبة</span><input id="rvVat" type="number" inputmode="decimal" step="0.01" value="' + pVat + '" placeholder="0" /></label></div>'
+      + '<div class="rsum" id="rvCheck"><span>مجموع الأصناف</span><span class="num" id="rvItemsSum">٠ ر.س</span></div>'
+    + '</div>'
+    + '<label class="field"><span class="lab">الإجمالي النهائي (ر.س)</span><input id="rvTotal" class="' + (pTotal ? "" : "flag") + '" type="number" inputmode="decimal" step="0.01" value="' + pTotal + '" placeholder="0" required /></label>'
+    + '<label class="field"><span class="lab">ملاحظات <span class="hint">(اختياري)</span></span><textarea id="rvNotes"></textarea></label>'
+    + '<div id="rvWarn" class="alert danger" style="display:none"><span class="ic">⚠️</span><span id="rvWarnT"></span></div>'
+    + '<button type="submit" class="btn primary block" id="rvSave" style="margin-top:6px">حفظ ' + (isPayment ? "العملية" : "الفاتورة") + '</button>'
     + '</form></div>';
   dlg.showModal();
   $("rvClose").onclick = function(){ dlg.close(); };
 
   function drawItems(){
-    var w = $("rvItems"); w.innerHTML = "";
+    var w = $("rvItems"); if (!w) return; w.innerHTML = "";
     items.forEach(function(it, idx){
       var row = document.createElement("div"); row.className = "ritem";
       row.innerHTML = '<input placeholder="اسم الصنف" aria-label="اسم الصنف" value="' + esc(it.name) + '" />'
@@ -367,50 +468,74 @@ function openReceiptReview(imgData){
       w.appendChild(row);
     });
   }
+  function realItemsList(){ return items.filter(function(it){ return it.name.trim() && num(it.price) > 0; }); }
+  function validDate(v){ return /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v).getTime()); }
   function recompute(){
-    var sum = items.reduce(function(s, it){ return s + num(it.qty) * num(it.price); }, 0);
-    $("rvItemsSum").textContent = fmt(sum);
     var total = num($("rvTotal").value);
-    var chk = $("rvCheck");
-    if (total > 0 && sum > 0 && Math.abs(sum - total) > Math.max(1, total * 0.02)) {
-      chk.className = "rsum mismatch"; $("rvItemsSum").textContent = fmt(sum) + " ⚠ لا يطابق الإجمالي";
-    } else { chk.className = "rsum"; }
+    var ri = realItemsList();
+    var sum = ri.reduce(function(s, it){ return s + num(it.qty) * num(it.price); }, 0);
+    var mismatch = false;
+    if (!isPayment){
+      if ($("rvItemsSum")) $("rvItemsSum").textContent = fmt(sum);
+      var chk = $("rvCheck");
+      if (ri.length && total > 0){
+        var v = window.ReceiptParser.validateItemSum(ri.map(function(x){ return { total: num(x.qty)*num(x.price) }; }), total, { subtotal: num($("rvSub").value)||null, vat: num($("rvVat").value)||null });
+        mismatch = !v.ok;
+        if (chk) chk.className = "rsum" + (mismatch ? " mismatch" : "");
+        if (mismatch && $("rvItemsSum")) $("rvItemsSum").textContent = fmt(sum) + " ⚠ لا يطابق الإجمالي";
+      } else if (chk) chk.className = "rsum";
+    }
+    // disable-save logic
+    var invalid = total <= 0 || !validDate($("rvDate").value) || (mismatch && !confirmedMismatch);
+    var warn = $("rvWarn"), wt = $("rvWarnT");
+    if (mismatch && !confirmedMismatch){
+      warn.style.display = "flex";
+      wt.innerHTML = 'مجموع الأصناف (' + fmt(sum) + ') لا يطابق الإجمالي (' + fmt(total) + '). صحّح الأصناف أو <a href="#" id="rvConfirm">أؤكد الحفظ رغم ذلك</a>.';
+      var cf = $("rvConfirm"); if (cf) cf.onclick = function(e){ e.preventDefault(); confirmedMismatch = true; recompute(); };
+    } else warn.style.display = "none";
+    $("rvSave").disabled = invalid;
+    $("rvSave").style.opacity = invalid ? ".55" : "1";
   }
-  $("rvAddItem").onclick = function(){ items.push({ name:"", qty:1, price:"" }); drawItems(); };
-  $("rvTotal").oninput = function(){
-    var t = num(this.value);
-    if (t > 0 && !num($("rvSub").value)) { var sub = t / 1.15; $("rvSub").value = sub.toFixed(2); $("rvVat").value = (t - sub).toFixed(2); }
-    recompute();
-  };
-  drawItems(); recompute();
+  if (!isPayment){
+    $("rvAddItem").onclick = function(){ items.push({ name:"", qty:1, price:"" }); drawItems(); recompute(); };
+    $("rvSub").oninput = recompute; $("rvVat").oninput = recompute;
+    $("rvTotal").oninput = function(){
+      var t = num(this.value);
+      if (t > 0 && !num($("rvSub").value)){ var sub = t/1.15; $("rvSub").value = sub.toFixed(2); $("rvVat").value = (t-sub).toFixed(2); }
+      recompute();
+    };
+    drawItems();
+  } else {
+    $("rvTotal").oninput = recompute;
+  }
+  $("rvDate").oninput = recompute;
+  recompute();
 
   var submitting = false;
   $("rvForm").onsubmit = function(ev){
     ev.preventDefault();
-    if (submitting) return;
+    if (submitting || $("rvSave").disabled) return;
     var total = num($("rvTotal").value);
-    var merchant = $("rvMerchant").value.trim();
+    var merchant = $("rvMerchant").value.trim() || (isPayment ? "عملية دفع" : "فاتورة");
     var date = $("rvDate").value;
-    if (total <= 0) { toast("أدخل الإجمالي النهائي", true); $("rvTotal").focus(); return; }
-    if (!merchant) { toast("أدخل اسم التاجر", true); $("rvMerchant").focus(); return; }
-    var realItems = items.filter(function(it){ return it.name.trim() && num(it.price) > 0; });
-    var sum = realItems.reduce(function(s, it){ return s + num(it.qty) * num(it.price); }, 0);
-    if (realItems.length && Math.abs(sum - total) > Math.max(1, total * 0.02)) {
-      if (!confirm("مجموع الأصناف (" + fmt(sum) + ") لا يطابق الإجمالي (" + fmt(total) + ").\nهل تريد الحفظ رغم ذلك؟")) return;
-    }
     submitting = true; $("rvSave").disabled = true;
+    var owner = $("rvOwner").value, account = $("rvAccount").value;
     var invId = uid();
-    var inv = { id: invId, merchant: merchant, invoiceDate: date, monthKey: date.slice(0,7),
-      subtotal: num($("rvSub").value), vat: num($("rvVat").value), total: total, category: $("rvCat").value,
-      receiptImage: imgData || "", source: "receipt", createdAt: nowISO(), updatedAt: nowISO() };
-    state.invoices.push(inv);
-    realItems.forEach(function(it){
-      state.invoiceItems.push({ id: uid(), invoiceId: invId, itemName: it.name.trim(), quantity: num(it.qty) || 1, unitPrice: num(it.price), totalPrice: num(it.qty) * num(it.price) });
-    });
-    // ONE parent expense transaction represents the invoice in totals
+    var ri = realItemsList();
+    if (!isPayment){
+      var inv = { id: invId, merchant: merchant, invoiceDate: date, monthKey: date.slice(0,7),
+        subtotal: num($("rvSub").value), vat: num($("rvVat").value), discount: num($("rvDisc").value), total: total,
+        category: $("rvCat").value, owner: owner, account: account, receiptImage: imgData || "", reference: $("rvRef").value.trim(),
+        source: "receipt", createdAt: nowISO(), updatedAt: nowISO() };
+      state.invoices.push(inv);
+      ri.forEach(function(it){ state.invoiceItems.push({ id: uid(), invoiceId: invId, itemName: it.name.trim(), quantity: num(it.qty)||1, unitPrice: num(it.price), totalPrice: +(num(it.qty)*num(it.price)).toFixed(2) }); });
+    }
+    // عملية مصروف أب واحدة تمثّل الفاتورة/الإيصال في المجاميع
     saveTx({ type: "expense", amount: total, date: date, category: $("rvCat").value, merchant: merchant,
-      notes: realItems.length ? (realItems.length + " أصناف") : "", source: "receipt", invoiceId: invId, receiptImage: imgData || "" });
-    dlg.close(); toast("تم حفظ الفاتورة ✓");
+      owner: owner, account: account, paymentMethod: $("rvPay").value, reference: $("rvRef").value.trim(),
+      time: $("rvTime").value.trim(), notes: $("rvNotes").value.trim() || (ri.length ? ri.length + " أصناف" : (isPayment ? "إيصال دفع" : "")),
+      source: "receipt", invoiceId: isPayment ? null : invId, receiptImage: imgData || "" });
+    dlg.close(); toast(isPayment ? "تم حفظ عملية الدفع ✓" : "تم حفظ الفاتورة ✓");
   };
 }
 
@@ -544,7 +669,7 @@ $("importBtn").onclick = function(){
     persist(); pushSnapshot(); renderAll(); ta.style.display = "none"; toast("تم الاستيراد ✓");
   } catch (e) { $("ioHint").style.display = "block"; $("ioHint").textContent = "نسخة غير صالحة."; }
 };
-$("wipeBtn").onclick = function(){ if (!confirm("مسح كل البيانات نهائيًا" + (sheetUrl ? " (ومن قوقل شيت)" : "") + "؟")) return; state = { tx:[],invoices:[],invoiceItems:[],commitments:[],savings:[],meta:{} }; persist(); pushSnapshot(); renderAll(); toast("تم المسح"); };
+$("wipeBtn").onclick = function(){ if (!confirm("مسح كل البيانات نهائيًا" + (sheetUrl ? " (ومن قوقل شيت)" : "") + "؟")) return; state = { tx:[],invoices:[],invoiceItems:[],commitments:[],savings:[],meta:{ _allowEmptyPush: true } }; persist(); pushSnapshot(); renderAll(); toast("تم المسح"); };
 
 /* =================== REPORT DOWNLOAD =================== */
 $("dlReport").onclick = function(){
@@ -699,4 +824,4 @@ if (sheetUrl) { pullSheet().catch(function(){ syncDots(); }); }
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(function(){});
 
 /* test hooks */
-window.__M = { get state(){ return state; }, calc: calc, monthKey: monthKey, view: view, saveTx: saveTx, deleteTx: deleteTx, primaryTx: primaryTx, renderAll: renderAll, openAdd: openAdd, go: go };
+window.__M = { get state(){ return state; }, calc: calc, monthKey: monthKey, view: view, saveTx: saveTx, deleteTx: deleteTx, primaryTx: primaryTx, renderAll: renderAll, openAdd: openAdd, go: go, openReceiptReview: openReceiptReview, fmtG: fmtG, validGregorian: validGregorian };
