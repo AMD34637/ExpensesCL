@@ -71,8 +71,8 @@
     var productLike = 0;
     lines.forEach(function (l) {
       if (isNonProductLine(l)) return;
-      if (/x|×|\*/.test(l) && /\d/.test(l)) productLike++;
-      else if (/[ء-يa-zA-Z].*\d+(?:[.,]\d+)?\s*$/.test(l)) productLike++;
+      var parsedItem = parseItemLine(l);
+      if (parsedItem && parsedItem.name && parsedItem.name.trim().length >= 2) productLike++;
     });
     // قرار: نقاط الدفع عالية أو لا منتجات => إيصال دفع
     if (paymentScore >= 2 && productLike < 2) return "payment";
@@ -134,6 +134,9 @@
   function pad(n) { return String(n).padStart(2, "0"); }
 
   function extractMerchant(text) {
+    var normalized = normalizeDigits(text);
+    var labeled = normalized.match(/(?:merchant|التاجر)\s*[:\-]?\s*([^\n]+)/i);
+    if (labeled && labeled[1]) return labeled[1].trim().slice(0, 40);
     var lines = String(text).split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
     // أول سطر فيه حروف وليس رقمًا/كلمة نظام
     for (var i = 0; i < lines.length && i < 6; i++) {
