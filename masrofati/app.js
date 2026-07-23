@@ -76,9 +76,10 @@ function pushSnapshot(){ // full snapshot upsert; safe against duplicates becaus
   // حماية: لا تكتب لقطة فارغة فوق بيانات سحابية صحيحة إلا بعد مسح/استيراد صريح
   if (snapshotEmpty(snap) && !state.meta._allowEmptyPush) { syncDots(); return Promise.resolve(); }
   var body = JSON.stringify({ action: "full", data: snap });
-  return fetch(sheetUrl, { method: "POST", body: body })
-    .then(function(){ pending = []; savePending(); syncDots(); })
-    .catch(function(){ pending = [{ action: "full" }]; savePending(); syncDots(); });
+  return fetch(sheetUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: body })
+    .then(function(r){ if (!r.ok) throw new Error("sync-http-" + r.status); return r.json(); })
+    .then(function(result){ if (!result || result.ok !== true) throw new Error("sync-rejected"); pending = []; savePending(); syncDots(); return result; })
+    .catch(function(err){ pending = [{ action: "full" }]; savePending(); syncDots(); throw err; });
 }
 function pullSheet(){
   if (!sheetUrl) return Promise.resolve();
@@ -94,6 +95,11 @@ function pullSheet(){
       renderAll();
     });
 }
+
+/* إعادة المزامنة تلقائيًا عند عودة الإنترنت، من دون تغيير واجهة التطبيق */
+window.addEventListener("online", function(){
+  if (sheetUrl && pending.length) pushSnapshot().catch(function(){});
+});
 
 /* ---------- CENTRAL CALCULATION ENGINE ---------- */
 function txForMonth(mk){ return state.tx.filter(function(t){ return t.monthKey === mk; }); }
