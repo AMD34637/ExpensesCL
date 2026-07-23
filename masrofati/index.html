@@ -310,6 +310,10 @@
     <div class="sec-h"><h3>المدخرات</h3><button class="text-btn" id="addSaving">+ هدف</button></div>
     <div id="savingList"></div>
 
+    <div class="sec-h"><h3>الحسابات</h3><button class="text-btn" id="addAccount">+ حساب</button></div>
+    <div class="panel" id="accountBox"></div>
+    <div class="card-actions" style="margin-top:8px"><button class="mini" id="addTransfer">⇄ تحويل بين الحسابات</button></div>
+
     <div class="sec-h"><h3>تقرير الشهر</h3><button class="text-btn" id="dlReport">تحميل التقرير</button></div>
     <div class="panel" id="reportBox"></div>
 
@@ -350,6 +354,8 @@
 <dialog id="dlgSaving"></dialog>
 <dialog id="dlgReceipt"></dialog>
 <dialog id="dlgSheet"></dialog>
+<dialog id="dlgAccount"></dialog>
+<dialog id="dlgTransfer"></dialog>
 <input type="file" id="receiptInput" accept="image/*" style="display:none" />
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
